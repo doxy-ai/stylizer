@@ -8,3 +8,6 @@
 [submodule "modules/waylib/core/thirdparty/glm"]
 	path = modules/waylib/core/thirdparty/glm
 	url = https://github.com/g-truc/glm
+[submodule "modules/waylib/window/thirdparty/glfw3webgpu"]
+	path = modules/waylib/window/thirdparty/glfw3webgpu
+	url = https://github.com/eliemichel/glfw3webgpu.git

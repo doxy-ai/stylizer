@@ -2,8 +2,10 @@
 
 #include "glfwpp/event.h"
 #include "waylib/core/core.hpp"
+#include "waylib/core/utility.hpp"
 
 #include <glfwpp/glfwpp.h>
+#include <glfw3webgpu.h>
 
 WAYLIB_BEGIN_NAMESPACE
 
@@ -11,54 +13,50 @@ WAYLIB_BEGIN_NAMESPACE
 		#include "window.h"
 	}
 
-	void maybe_initialize_glfw();
-
 	struct window {
 		glfw::Window raw;
 
-		static struct window create(vec2u size, std::string_view name = "Waylib", window_config config = {}) {
-			maybe_initialize_glfw();
-			glfw::WindowHints{
-				.resizable = config.resizable,
-				.visible = config.visible,
-				.decorated = config.decorated,
-				.focused = config.focused,
-				.autoIconify = config.auto_iconify,
-				.floating = config.floating,
-				.maximized = config.maximized,
-				.centerCursor = config.center_cursor,
-				.transparentFramebuffer = config.transparent_framebuffer,
-				.focusOnShow = config.focus_on_show,
-				.scaleToMonitor = config.scale_to_monitor,
+		static struct window create(vec2u size, std::string_view name = "Waylib", window_config config = {});
 
-				.redBits = config.red_bits,
-				.greenBits = config.green_bits,
-				.blueBits = config.blue_bits,
-				.alphaBits = config.alpha_bits,
-				.depthBits = config.depth_bits,
-				.stencilBits = config.stencil_bits,
-				.accumRedBits = config.accum_red_bits,
-				.accumGreenBits = config.accum_green_bits,
-				.accumBlueBits = config.accum_blue_bits,
-				.accumAlphaBits = config.accum_alpha_bits,
-
-				.auxBuffers = config.aux_buffers,
-				.samples = config.samples,
-				.refreshRate = config.refresh_rate,
-				.stereo = config.stereo,
-				.srgbCapable = config.srgb_capable,
-				.doubleBuffer = config.double_buffer,
-
-				.clientApi = glfw::ClientApi::None,
-			}.apply();
-
-			return {glfw::Window(size.x, size.y, cstring_from_view(name), nullptr, nullptr)};
-		}
-
-		bool should_close(bool poll_events = true) {
+		bool should_close(bool poll_events = true) const {
 			if(poll_events) glfw::pollEvents();
 			return raw.shouldClose();
 		}
+
+		vec2u get_dimensions() const {
+			vec2u out; std::tie(out.x, out.y) = raw.getSize();
+			return out;
+		}
+
+		wgpu::Surface get_surface(WGPUInstance instance) const {
+			return glfwCreateWindowWGPUSurface(instance, raw);
+		}
+
+		result<wgpu_state> create_default_state(bool prefer_low_power = false) const WAYLIB_TRY {
+			auto partial = wgpu_state::create_default(nullptr, prefer_low_power);
+			if(!partial) return partial;
+			partial->surface = get_surface(partial->instance);
+			return partial;
+		} WAYLIB_CATCH
+
+		void configure_surface(wgpu_state& state, surface_configuration config = {}) const {
+			state.configure_surface(get_dimensions(), config);
+		}
+
+		void reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
+			raw.sizeEvent.append([&state, config](glfw::Window&, int x, int y){
+				state.configure_surface({x, y}, config);
+			});
+			if(config.automatic_should_configure_now) configure_surface(state, config);
+		}
+
+	};
+
+	template<>
+	struct auto_release<window> : public window {
+		using window::window;
+		using window::operator=;
+		auto_release(window&& o) : window(std::move(o)) {}
 	};
 
 WAYLIB_END_NAMESPACE

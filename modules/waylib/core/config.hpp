@@ -30,8 +30,10 @@ WAYLIB_BEGIN_NAMESPACE
 
 #if defined(__cpp_lib_expected) && __cpp_lib_expected > 202202L
 	using std::expected;
+	using std::unexpected;
 #else // std::expected?
 	using tl::expected;
+	using tl::unexpected;
 #endif // std::expected?
 
 	extern "C" {

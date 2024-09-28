@@ -12,7 +12,7 @@ Additionally the engine is designed around being increadibly modular, this libra
 
 ## License
 
-All of the code in modules is MIT licensed, additional thirdparty dependencies may have differnet liceneses, here they are in summary but feel free to explore in more detail:
+All of the code in modules is MIT licensed, additional thirdparty dependencies may have different liceneses, here they are in summary but feel free to explore in more detail:
 
 
 All of the images and models in the resources folder are creative commons (TODO: Version) licensed.

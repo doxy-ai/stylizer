@@ -47,4 +47,57 @@ void WAYLIB_PREFIXED(thread_pool_future_wait)(
 #endif
 );
 
+
+//////////////////////////////////////////////////////////////////////
+// # wgpu_state
+//////////////////////////////////////////////////////////////////////
+
+
+WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(default_state_from_instance)(
+	WGPUInstance instance,
+	WAYLIB_NULLABLE(WGPUSurface) surface
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= nullptr
+#endif
+	, bool prefer_low_power
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= false
+#endif
+);
+
+WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(create_state)(
+	WAYLIB_NULLABLE(WGPUSurface) surface
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= nullptr
+#endif
+	, bool prefer_low_power
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= false
+#endif
+);
+
+void WAYLIB_PREFIXED(release_state)(
+	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
+	bool adapter_release
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= true
+#endif
+	, bool instance_release
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= true
+#endif
+);
+
+WAYLIB_PREFIXED(surface_configuration) WAYLIB_PREFIXED(default_surface_configuration)();
+
+void WAYLIB_PREFIXED(state_configure_surface)(
+	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
+	WAYLIB_PREFIXED_C_CPP_TYPE(vec2u, vec2uC) size,
+	WAYLIB_PREFIXED(surface_configuration) config
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= {}
+#endif
+);
+
+
 #endif // WAYLIB_CORE_IS_AVAILABLE

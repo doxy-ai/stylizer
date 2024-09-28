@@ -31,7 +31,7 @@
 		optional& operator=(optional&&) = default;
 
 		operator bool() const noexcept { return has_value; }
-		T& operator*()  noexcept{ return value; }
+		T& operator*() noexcept{ return value; }
 		const T& operator*() const noexcept { return value; }
 		T* operator->() noexcept { return &value; }
 		const T* operator->() const noexcept { return &value; }

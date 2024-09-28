@@ -10,14 +10,59 @@
 WAYLIB_BEGIN_NAMESPACE
 
 	template<typename T>
+	struct auto_release: public T {
+		auto_release() : T() {}
+		auto_release(T&& raw) : T(std::move(raw)) {}
+		auto_release(const auto_release&) = delete;
+		auto_release(auto_release&& other) : T(std::move(other)) {}
+		auto_release& operator=(T&& raw) { static_cast<T&>(*this) = std::move(raw); return *this; }
+		auto_release& operator=(const auto_release&) = delete;
+		auto_release& operator=(auto_release&& other) {{ static_cast<T&>(*this) = std::move(static_cast<T&>(other)); return *this; }}
+
+		~auto_release() { if(*this) this->release(); }
+	};
+
+	#define WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(type)\
+		type() {}\
+		type(const type&) = default;\
+		type& operator=(const type&) = default;
+
+//////////////////////////////////////////////////////////////////////
+// # Error Handling
+//////////////////////////////////////////////////////////////////////
+
+	// Forward decls
+	template<typename T>
+	struct result;
+	template<typename T>
+	inline T throw_if_error(const result<T>& res);
+
+#ifdef __cpp_exceptions
+	struct exception: public std::runtime_error {
+		using std::runtime_error::runtime_error;
+	};
+#endif
+
+	template<typename T>
 	struct result: expected<T, std::string> {
 		using expected<T, std::string>::expected;
+
+		T throw_if_error() { return WAYLIB_NAMESPACE::throw_if_error(*this); }
 	};
 
 	struct void_like{};
 	template<>
 	struct result<void>: expected<void_like, std::string> {
 		using expected<void_like, std::string>::expected;
+
+		void throw_if_error() {
+			if(!*this)
+#ifdef __cpp_exceptions
+				throw exception(this->error());
+#else
+				assert(false, this->error().c_str());
+#endif
+		}
 	};
 
 	struct errors {
@@ -30,7 +75,7 @@ WAYLIB_BEGIN_NAMESPACE
 			if(singleton.empty()) return nullptr;
 			return singleton.c_str();
 		}
-		inline static void set(const std::string_view view) { singleton = view; }
+		inline static void set_view(const std::string_view view) { singleton = view; }
 		inline static void set(const std::string& str) { singleton = str; }
 
 		template<typename T>
@@ -41,13 +86,9 @@ WAYLIB_BEGIN_NAMESPACE
 	};
 
 #ifdef __cpp_exceptions
-	struct exception: public std::runtime_error {
-		using std::runtime_error::runtime_error;
-	};
-
 	template<typename T>
 	inline T throw_if_error(const WAYLIB_OPTIONAL(T)& opt) {
-		if(opt.has_value) return opt.value;
+		if(opt.is_allocated) return opt.value;
 
 		auto msg = errors::get_and_clear();
 		throw exception(msg.empty() ? "Null value encountered" : msg);
@@ -64,6 +105,9 @@ WAYLIB_BEGIN_NAMESPACE
 		if(res) return *res;
 		throw exception(res.error());
 	}
+
+	#define WAYLIB_TRY try
+	#define WAYLIB_CATCH catch(const std::exception& e) { return unexpected(e.what()); }
 #else
 	template<typename T>
 	inline T throw_if_error(const WAYLIB_OPTIONAL(T)& opt) {
@@ -80,7 +124,16 @@ WAYLIB_BEGIN_NAMESPACE
 		if(res) return *res;
 		throw exception(res.error());
 	}
+
+	#define WAYLIB_TRY
+	#define WAYLIB_CATCH
 #endif
+
+
+//////////////////////////////////////////////////////////////////////
+// # Miscelanious
+//////////////////////////////////////////////////////////////////////
+
 
 	// Creates a c-string from a string view
 	// (if the string view doesn't point to a valid cstring a temporary one that
