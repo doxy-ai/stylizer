@@ -11,15 +11,42 @@
 #include "interfaces.h"
 
 //////////////////////////////////////////////////////////////////////
+// # Main Loop Macros
+//////////////////////////////////////////////////////////////////////
+
+
+#ifdef __EMSCRIPTEN__
+	#define WAYLIB_MAIN_LOOP_CONTINUE return
+	#define WAYLIB_MAIN_LOOP_BREAK emscripten_cancel_main_loop()
+	#define WAYLIB_MAIN_LOOP(continue_expression, body)\
+		auto callback = [&]() {\
+			if(!(continue_expression)) WAYLIB_MAIN_LOOP_BREAK;\
+			body\
+		};\
+		emscripten_set_main_loop(WAYLIB_NAMESPACE::closure_to_function_pointer(callback), 0, true);
+#else // !__EMSCRIPTEN__
+	#define WAYLIB_MAIN_LOOP(continue_expression, body)\
+		while(continue_expression) {\
+			body\
+		}
+	#define WAYLIB_MAIN_LOOP_CONTINUE continue
+	#define WAYLIB_MAIN_LOOP_BREAK break
+#endif // __EMSCRIPTEN__
+
+
+//////////////////////////////////////////////////////////////////////
 // # Errors
 //////////////////////////////////////////////////////////////////////
+
 
 WAYLIB_NULLABLE(const char*) get_error_message();
 void clear_error_message();
 
+
 //////////////////////////////////////////////////////////////////////
 // # Thread Pool
 //////////////////////////////////////////////////////////////////////
+
 
 struct WAYLIB_PREFIXED(thread_pool_future);
 

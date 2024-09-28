@@ -135,6 +135,12 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
+	template<typename F>
+	auto closure_to_function_pointer(F _f) {
+		static F f = _f;
+		return +[]{ f(); };
+	}
+
 	// Creates a c-string from a string view
 	// (if the string view doesn't point to a valid cstring a temporary one that
 	//		is only valid until the next time this function is called is created)

@@ -69,7 +69,7 @@ WAYLIB_BEGIN_NAMESPACE
 			WGPUInstance instance = wgpu::createInstance(wgpu::Default);
 			if(!instance) return unexpected("Failed to create WebGPU Instance");
 #else
-			WGPUInstance instance = 1;
+			WGPUInstance instance; *((size_t*)&instance) = 1;
 #endif
 			return default_from_instance(instance, surface, prefer_low_power);
 		} WAYLIB_CATCH
@@ -77,8 +77,10 @@ WAYLIB_BEGIN_NAMESPACE
 		operator bool() { return instance && adapter && device; } // NOTE: Bool conversion needed for auto_release
 		void release(bool adapter_release = true, bool instance_release = true) {
 			device.getQueue().release();
+#ifndef __EMSCRIPTEN__
 			// We expect the device to be lost when it is released... so don't do anything to stop it
 			auto callback = device.setDeviceLostCallback([](WGPUDeviceLostReason reason, char const* message) {});
+#endif
 			device.release();
 			if(surface) surface.release();
 			if(adapter_release) adapter.release();

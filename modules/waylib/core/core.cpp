@@ -76,6 +76,18 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 		.defaultQueue = {
 			.label = "Waylib Queue"
 		},
+#ifdef __EMSCRIPTEN__
+		.deviceLostCallback = [](WGPUDeviceLostReason reason, char const* message, void* userdata) {
+			std::stringstream s;
+			s << "Device lost: reason " << wgpu::DeviceLostReason{reason};
+			if (message) s << " (" << message << ")";
+#ifdef __cpp_exceptions
+			throw exception(s.str());
+#else // __cpp_exceptions
+			assert(false, s.str().c_str());
+#endif // __cpp_exceptions
+		},
+#else // __EMSCRIPTEN__
 		.deviceLostCallbackInfo = {
 			.mode = wgpu::CallbackMode::AllowSpontaneous,
 			.callback = [](WGPUDevice const* device, WGPUDeviceLostReason reason, char const* message, void* userdata) {
@@ -84,9 +96,9 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 				if (message) s << " (" << message << ")";
 #ifdef __cpp_exceptions
 				throw exception(s.str());
-#else
+#else // __cpp_exceptions
 				assert(false, s.str().c_str());
-#endif
+#endif // __cpp_exceptions
 			}
 		},
 		.uncapturedErrorCallbackInfo = {
@@ -96,11 +108,12 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 				if (message) s << " (" << message << ")";
 #ifdef __cpp_exceptions
 				throw exception(s.str());
-#else
+#else // __cpp_exceptions
 				errros::set(s.str());
-#endif
+#endif // __cpp_exceptions
 			}
-		},
+		}
+#endif // __EMSCRIPTEN__
 
 	});
 	if(!device) return unexpected("Failed to create device.");

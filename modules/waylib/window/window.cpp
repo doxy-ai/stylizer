@@ -1,6 +1,10 @@
 #include "window.hpp"
 #include "waylib/core/config.h"
 
+#ifdef __EMSCRIPTEN__
+	void glfwInitHint(int hint, int value) {}
+#endif
+
 WAYLIB_BEGIN_NAMESPACE
 
 bool glfw_initialized = false;

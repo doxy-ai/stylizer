@@ -7,8 +7,9 @@ int main() {
 	wl::auto_release state = window.create_default_state().throw_if_error();
 	window.reconfigure_surface_on_resize(state);
 
-	while (!window.should_close())
+	WAYLIB_MAIN_LOOP(!window.should_close(),
 		wl::thread_pool::enqueue([]{
 			std::cout << "Hello 世界" << std::endl;
 		});
+	);
 }
