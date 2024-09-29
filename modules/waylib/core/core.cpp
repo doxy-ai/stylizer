@@ -1,8 +1,10 @@
+#define TCPP_IMPLEMENTATION
 #define WEBGPU_CPP_IMPLEMENTATION
 #define IS_WAYLIB_CORE_CPP
 #include "core.hpp"
 
 #include <algorithm>
+#include <map>
 
 WAYLIB_BEGIN_NAMESPACE
 
@@ -118,9 +120,27 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 	});
 	if(!device) return unexpected("Failed to create device.");
 
-	return wgpu_state(instance, adapter, device, surface);
+	return wgpu_stateC{instance, adapter, device, surface};
 } WAYLIB_CATCH
 
+result<texture> wgpu_state::current_surface_texture() {
+	wgpu::SurfaceTexture texture_;
+	surface.getCurrentTexture(&texture_);
+	if(texture_.status != wgpu::SurfaceGetCurrentTextureStatus::Success) {
+		std::stringstream s; s << "Texture error: " << wgpu::SurfaceGetCurrentTextureStatus{texture_.status};
+		return unexpected(s.str());
+	}
+
+	texture out = textureC{.gpu_texture = texture_.texture};
+	out.maybe_create_view();
+	return out;
+}
+
+result<struct drawing_state> wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */){
+	auto texture = current_surface_texture();
+	if(!texture) return unexpected(texture.error());
+	return texture->begin_drawing(*this, clear_color);
+}
 
 WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(default_state_from_instance)(
 	WGPUInstance instance,
@@ -159,6 +179,323 @@ void WAYLIB_PREFIXED(state_configure_surface)(
 ) {
 	wgpu_state& state = *static_cast<wgpu_state*>(state_);
 	state.configure_surface(fromC(size), config);
+}
+
+WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)) WAYLIB_PREFIXED(current_surface_texture)(
+	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state_
+) {
+	wgpu_state& state = *static_cast<wgpu_state*>(state_);
+	return res2opt<texture, textureC>(state.current_surface_texture());
+}
+
+WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC)) WAYLIB_PREFIXED(begin_drawing_to_surface)(
+	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state_,
+	WAYLIB_OPTIONAL(colorC) clear_color /* = {} */
+) {
+	wgpu_state& state = *static_cast<wgpu_state*>(state_);
+	return res2opt<drawing_state, drawing_stateC>(state.begin_drawing_to_surface(clear_color));
+}
+
+
+//////////////////////////////////////////////////////////////////////
+// # Texture
+//////////////////////////////////////////////////////////////////////
+
+
+result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) WAYLIB_TRY {
+	static WGPUTextureViewDescriptor viewDesc = {
+		// .format = color.getFormat(),
+		.dimension = wgpu::TextureViewDimension::_2D,
+		.baseMipLevel = 0,
+		.mipLevelCount = 1,
+		.baseArrayLayer = 0,
+		.arrayLayerCount = 1,
+		// .aspect = wgpu::TextureAspect::DepthOnly,
+	};
+	static WGPUTextureFormat depthTextureFormat = wgpu::TextureFormat::Depth24Plus;
+	static WGPUTextureDescriptor depthTextureDesc = {
+		.usage = wgpu::TextureUsage::RenderAttachment,
+		.dimension = wgpu::TextureDimension::_2D,
+		.format = depthTextureFormat,
+		.mipLevelCount = 1,
+		.sampleCount = 1,
+		.viewFormatCount = 1,
+		.viewFormats = (WGPUTextureFormat*)&depthTextureFormat,
+	};
+
+	drawing_stateC out {.state = &state, .gbuffer = nullptr};
+	// static frame_finalizers finalizers;
+
+	// Create a command encoder for the draw call
+	wgpu::CommandEncoderDescriptor encoderDesc = {};
+	encoderDesc.label = "Waylib Render Command Encoder";
+	out.render_encoder = state.device.createCommandEncoder(encoderDesc);
+	encoderDesc.label = "Waylib Command Encoder";
+	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
+
+	static texture depthTexture = {};
+	depthTextureDesc.size = {gpu_texture.getWidth(), gpu_texture.getHeight(), 1};
+	if(!depthTexture.gpu_texture || (depthTexture.gpu_texture.getWidth() != depthTextureDesc.size.width && depthTexture.gpu_texture.getHeight() != depthTextureDesc.size.height)) {
+		depthTexture.gpu_texture = state.device.createTexture(depthTextureDesc);
+		depthTexture.maybe_create_view(wgpu::TextureAspect::DepthOnly);
+	}
+
+
+	// Create the render pass that clears the screen with our color
+	wgpu::RenderPassDescriptor renderPassDesc = {};
+
+	// The attachment part of the render pass descriptor describes the target texture of the pass
+	wgpu::RenderPassColorAttachment colorAttachment = {};
+	colorAttachment.view = view;
+	colorAttachment.resolveTarget = nullptr;
+	colorAttachment.loadOp = clear_color ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	colorAttachment.storeOp = wgpu::StoreOp::Store;
+	colorAttachment.clearValue = toWGPU(clear_color ? *clear_color : colorC{0, 0, 0, 1});
+	colorAttachment.depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+
+	// We now add a depth/stencil attachment:
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment;
+	depthStencilAttachment.view = /* support_depth ? */ depthTexture.view /* : nullptr */;
+	// The initial value of the depth buffer, meaning "far"
+	depthStencilAttachment.depthClearValue = 1.0f;
+	// Operation settings comparable to the color attachment
+	depthStencilAttachment.depthLoadOp = clear_color.has_value ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+	// we could turn off writing to the depth buffer globally here
+	depthStencilAttachment.depthReadOnly = false;
+
+	// Stencil setup, mandatory but unused
+	depthStencilAttachment.stencilClearValue = 0;
+	// depthStencilAttachment.stencilLoadOp = clear_color.has_value ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	// depthStencilAttachment.stencilStoreOp = wgpu::StoreOp::Store;
+	depthStencilAttachment.stencilLoadOp = wgpu::LoadOp::Undefined;
+	depthStencilAttachment.stencilStoreOp = wgpu::StoreOp::Undefined;
+	depthStencilAttachment.stencilReadOnly = true;
+
+	renderPassDesc.colorAttachmentCount = 1;
+	renderPassDesc.colorAttachments = &colorAttachment;
+	renderPassDesc.depthStencilAttachment = /* support_depth ? */ &depthStencilAttachment /* : nullptr */;
+	renderPassDesc.timestampWrites = nullptr;
+
+	// Create the render pass
+	out.render_pass = out.render_encoder.beginRenderPass(renderPassDesc);
+	// setup_default_bindings(out);
+	return {{std::move(out)}};
+} WAYLIB_CATCH
+
+
+result<texture*> texture::blit(drawing_state& draw, shader& blit_shader, bool dirty /* = false */) {
+	static std::map<WGPUShaderModule, material> material_map = {};
+	material* blitMaterial;
+	if(material_map.contains(blit_shader.module) && !dirty) 
+		blitMaterial = &material_map[blit_shader.module];
+	else {
+		blitMaterial = &(material_map[blit_shader.module] = materialC{
+			.shaders = &blit_shader,
+			.shader_count = 1
+		});
+		auto target = texture::default_color_target_state(format());
+		blitMaterial->upload(draw.state(), {&target, 1}, {{}}, {.double_sided = true});
+	}
+	// TODO: Frame defer release
+
+	WGPUBindGroupEntry x;
+	std::array<WGPUBindGroupEntry, 2> bindings = {};
+	bindings[0].binding = 0;
+	bindings[0].textureView = view;
+	bindings[1].binding = 1;
+	bindings[1].sampler = sampler ? sampler : default_sampler(draw.state());
+	auto bindGroup = draw.state().device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: Frame defer
+		.layout = blitMaterial->pipeline.getBindGroupLayout(0),
+		.entryCount = bindings.size(),
+		.entries = bindings.data()
+	});
+
+	draw.render_pass.setPipeline(blitMaterial->pipeline);
+	draw.render_pass.setBindGroup(0, bindGroup, 0, nullptr);
+	draw.render_pass.draw(3, 1, 0, 0);
+	return result<void>::success;
+}
+
+result<void> texture::blit(drawing_state& draw) {
+	static auto_release<shader> blitShader = {};
+	if(!blitShader) {
+		auto tmp = shader::from_wgsl(draw.state(), R"_(
+struct vertex_output {
+	@builtin(position) raw_position: vec4f,
+	@location(0) uv: vec2f
+};
+
+@group(0) @binding(0) var texture: texture_2d<f32>;
+@group(0) @binding(1) var sampler_: sampler;
+
+@vertex
+fn vertex(@builtin(vertex_index) vertex_index: u32) -> vertex_output {
+	switch vertex_index {
+		case 0u: {
+			return vertex_output(vec4f(-1.0, -3.0, .99, 1.0), vec2f(0.0, 1.5));
+		}
+		case 1u: {
+			return vertex_output(vec4f(3.0, 1.0, .99, 1.0), vec2f(1.5, 0.0));
+		}
+		case 2u, default: {
+			return vertex_output(vec4f(-1.0, 1.0, .99, 1.0), vec2f(0.0));
+		}
+	}
+}
+
+@fragment
+fn fragment(vert: vertex_output) -> @location(0) vec4f {
+	return textureSample(texture, sampler_, vert.uv);
+}
+		)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment"});
+		if(!tmp) return unexpected(tmp.error());
+		blitShader = std::move(*tmp);
+	}
+
+	return blit(draw, blitShader, false);
+}
+
+result<void> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
+	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
+	if(!draw) return unexpected(draw.error());
+	blit(*draw);
+	return draw->draw().get();
+}
+
+result<void> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
+	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
+	if(!draw) return unexpected(draw.error());
+	blit(*draw, blit_shader, false);
+	if(auto res = draw->draw(); !res) return unexpected(res.error());
+	return draw;
+}
+
+
+//////////////////////////////////////////////////////////////////////
+// # Gbuffer
+//////////////////////////////////////////////////////////////////////
+
+
+result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) WAYLIB_TRY {
+	drawing_stateC out {.state = &state, .gbuffer = this};
+	// static frame_finalizers finalizers;
+
+	// Create a command encoder for the draw call
+	wgpu::CommandEncoderDescriptor encoderDesc = {};
+	encoderDesc.label = "Waylib Render Command Encoder";
+	out.render_encoder = state.device.createCommandEncoder(encoderDesc);
+	encoderDesc.label = "Waylib Command Encoder";
+	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
+
+
+	// Create the render pass that clears the screen with our color
+	wgpu::RenderPassDescriptor renderPassDesc = {};
+
+	// The attachment part of the render pass descriptor describes the target texture of the pass
+	std::array<wgpu::RenderPassColorAttachment, 2> colorAttachments = {};
+	// Color Attachment
+	colorAttachments[0].view = color().view;
+	colorAttachments[0].resolveTarget = nullptr;
+	colorAttachments[0].loadOp = clear_color ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	colorAttachments[0].storeOp = wgpu::StoreOp::Store;
+	colorAttachments[0].clearValue = toWGPU(clear_color ? *clear_color : colorC{0, 0, 0, 0});
+	colorAttachments[0].depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+	// Normal Attachment
+	colorAttachments[1].view = normal().view;
+	colorAttachments[1].resolveTarget = nullptr;
+	colorAttachments[1].loadOp = clear_color ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	colorAttachments[1].storeOp = wgpu::StoreOp::Store;
+	colorAttachments[1].clearValue = {0, 0, 0, 0};
+	colorAttachments[1].depthSlice = WGPU_DEPTH_SLICE_UNDEFINED;
+
+	// We now add a depth/stencil attachment:
+	wgpu::RenderPassDepthStencilAttachment depthStencilAttachment;
+	depthStencilAttachment.view = depth().view;
+	// The initial value of the depth buffer, meaning "far"
+	depthStencilAttachment.depthClearValue = 1.0f;
+	// Operation settings comparable to the color attachment
+	depthStencilAttachment.depthLoadOp = clear_color.has_value ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+	// we could turn off writing to the depth buffer globally here
+	depthStencilAttachment.depthReadOnly = false;
+
+	// Stencil setup, mandatory but unused
+	depthStencilAttachment.stencilClearValue = 0;
+	// depthStencilAttachment.stencilLoadOp = clear_color.has_value ? wgpu::LoadOp::Clear : wgpu::LoadOp::Load;
+	// depthStencilAttachment.stencilStoreOp = wgpu::StoreOp::Store;
+	depthStencilAttachment.stencilLoadOp = wgpu::LoadOp::Undefined;
+	depthStencilAttachment.stencilStoreOp = wgpu::StoreOp::Undefined;
+	depthStencilAttachment.stencilReadOnly = true;
+
+	renderPassDesc.colorAttachmentCount = colorAttachments.size();
+	renderPassDesc.colorAttachments = colorAttachments.data();
+	renderPassDesc.depthStencilAttachment = &depthStencilAttachment;
+	renderPassDesc.timestampWrites = nullptr;
+
+	// Create the render pass
+	out.render_pass = out.render_encoder.beginRenderPass(renderPassDesc);
+	// setup_default_bindings(out);
+	return {{std::move(out)}};
+} WAYLIB_CATCH
+
+
+//////////////////////////////////////////////////////////////////////
+// # shader
+//////////////////////////////////////////////////////////////////////
+
+
+std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> shader::configure_render_pipeline_descriptor(
+	wgpu_state& state,
+	std::span<WGPUColorTargetState> gbuffer_targets,
+	WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout /* = {} */,
+	wgpu::RenderPipelineDescriptor pipelineDesc /* = {} */
+) {
+	// static WGPUBlendState blendState = {
+	// 	.color = {
+	// 		.operation = wgpu::BlendOperation::Add,
+	// 		.srcFactor = wgpu::BlendFactor::SrcAlpha,
+	// 		.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha,
+	// 	},
+	// 	.alpha = {
+	// 		.operation = wgpu::BlendOperation::Add,
+	// 		.srcFactor = wgpu::BlendFactor::One,
+	// 		.dstFactor = wgpu::BlendFactor::Zero,
+	// 	},
+	// };
+	// thread_local static WGPUColorTargetState colorTarget = {
+	// 	.nextInChain = nullptr,
+	// 	.format = state.surface_format,
+	// 	.blend = &blendState,
+	// 	.writeMask = wgpu::ColorWriteMask::All,
+	// };
+
+
+	std::span<WGPUVertexBufferLayout> bufferLayouts;
+	if(mesh_layout) bufferLayouts = *mesh_layout;
+	else bufferLayouts = {(WGPUVertexBufferLayout*)mesh::mesh_layout().data(), mesh::mesh_layout().size()};
+
+	if(vertex_entry_point.value) {
+		pipelineDesc.vertex.bufferCount = bufferLayouts.size();
+		pipelineDesc.vertex.buffers = bufferLayouts.data();
+		pipelineDesc.vertex.constantCount = 0;
+		pipelineDesc.vertex.constants = nullptr;
+		pipelineDesc.vertex.entryPoint = *vertex_entry_point;
+		pipelineDesc.vertex.module = module;
+	}
+
+	if(fragment_entry_point.value) {
+		static wgpu::FragmentState fragment;
+		fragment.constantCount = 0;
+		fragment.constants = nullptr;
+		fragment.entryPoint = *fragment_entry_point;
+		fragment.module = module;
+		fragment.targetCount = gbuffer_targets.size();
+		fragment.targets = gbuffer_targets.data();
+		pipelineDesc.fragment = &fragment;
+		return {pipelineDesc, fragment};
+	}
+	return {pipelineDesc, {}};
 }
 
 

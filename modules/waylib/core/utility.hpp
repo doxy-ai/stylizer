@@ -1,5 +1,6 @@
 #pragma once
 #include "config.hpp"
+
 #include "thirdparty/thread_pool.hpp"
 #include "optional.h"
 
@@ -23,9 +24,11 @@ WAYLIB_BEGIN_NAMESPACE
 	};
 
 	#define WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(type)\
+		using type ## C::type ## C;\
 		type() {}\
 		type(const type&) = default;\
-		type& operator=(const type&) = default;
+		type& operator=(const type&) = default;\
+		type(type ## C&& c) : type ## C(std::move(c)) {}
 
 //////////////////////////////////////////////////////////////////////
 // # Error Handling
@@ -54,6 +57,7 @@ WAYLIB_BEGIN_NAMESPACE
 	template<>
 	struct result<void>: expected<void_like, std::string> {
 		using expected<void_like, std::string>::expected;
+		static constexpr void_like success = {};
 
 		void throw_if_error() {
 			if(!*this)
@@ -64,6 +68,15 @@ WAYLIB_BEGIN_NAMESPACE
 #endif
 		}
 	};
+
+	namespace detail {
+		template<typename T>
+		struct void2void_like { using type = T; };
+		template<>
+		struct void2void_like<void> { using type = void_like; };
+		template<typename T>
+		using void2void_like_t = void2void_like<T>::type;
+	}
 
 	struct errors {
 	protected:
@@ -136,7 +149,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 
 	template<typename F>
-	auto closure_to_function_pointer(F _f) {
+	auto closure2function_pointer(F _f) {
 		static F f = _f;
 		return +[]{ f(); };
 	}
@@ -153,7 +166,14 @@ WAYLIB_BEGIN_NAMESPACE
 	}
 
 	template<typename T>
-	inline WAYLIB_OPTIONAL(T) res2opt(const result<T>& res) {
+	std::future<T> value2future(T&& value) {
+		static std::promise<T> promise;
+		promise.set_value(std::move(value));
+		return promise.get_future();
+	}
+
+	template<typename Tin, typename Tout = Tin>
+	inline WAYLIB_OPTIONAL(detail::void2void_like_t<Tout>) res2opt(const result<Tin>& res) {
 		if(res) return *res;
 
 		errors::set(res);

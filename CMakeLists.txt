@@ -9,8 +9,12 @@ else()
 	set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -sSTACK_OVERFLOW_CHECK=2") #emscripten version
+
 add_subdirectory(modules/waylib/core)
 add_subdirectory(modules/waylib/window)
+# add_subdirectory(modules/waylib/obj)
 
 add_executable(waylib_tests test.cpp)
 target_link_libraries(waylib_tests PUBLIC waylib::core waylib::window)

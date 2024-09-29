@@ -1,5 +1,6 @@
 #include "window.hpp"
 #include "waylib/core/config.h"
+#include "waylib/core/utility.hpp"
 
 #ifdef __EMSCRIPTEN__
 	void glfwInitHint(int hint, int value) {}
@@ -103,22 +104,22 @@ WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREF
 	));
 }
 
-void WAYLIB_PREFIXED(window_configure_surface)(
+bool WAYLIB_PREFIXED(window_configure_surface)(
 	WAYLIB_PREFIXED(window)* window_,
 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
 	WAYLIB_PREFIXED(surface_configuration) config /* = {} */
 )  {
 	struct window& window = *static_cast<struct window*>(window_);
-	return window.configure_surface(static_cast<wgpu_state&>(*state), config);
+	return res2opt(window.configure_surface(static_cast<wgpu_state&>(*state), config));
 }
 
-void WAYLIB_PREFIXED(window_reconfigure_surface_on_resize)(
+bool WAYLIB_PREFIXED(window_reconfigure_surface_on_resize)(
 	WAYLIB_PREFIXED(window)* window_,
 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
 	WAYLIB_PREFIXED(surface_configuration) config /* = {} */
 )  {
 	struct window& window = *static_cast<struct window*>(window_);
-	return window.reconfigure_surface_on_resize(static_cast<wgpu_state&>(*state), config);
+	return res2opt(window.reconfigure_surface_on_resize(static_cast<wgpu_state&>(*state), config));
 }
 
 WAYLIB_END_NAMESPACE

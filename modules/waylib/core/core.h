@@ -23,7 +23,7 @@
 			if(!(continue_expression)) WAYLIB_MAIN_LOOP_BREAK;\
 			body\
 		};\
-		emscripten_set_main_loop(WAYLIB_NAMESPACE::closure_to_function_pointer(callback), 0, true);
+		emscripten_set_main_loop(WAYLIB_NAMESPACE::closure2function_pointer(callback), 0, true);
 #else // !__EMSCRIPTEN__
 	#define WAYLIB_MAIN_LOOP(continue_expression, body)\
 		while(continue_expression) {\
@@ -126,5 +126,16 @@ void WAYLIB_PREFIXED(state_configure_surface)(
 #endif
 );
 
+WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)) WAYLIB_PREFIXED(current_surface_texture)(
+	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state
+);
+
+WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC)) WAYLIB_PREFIXED(begin_drawing_to_surface)(
+	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
+	WAYLIB_OPTIONAL(colorC) clear_color
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= {}
+#endif
+);
 
 #endif // WAYLIB_CORE_IS_AVAILABLE

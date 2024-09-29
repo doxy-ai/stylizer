@@ -162,7 +162,7 @@ WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREF
 #endif
 );
 
-void WAYLIB_PREFIXED(window_configure_surface)(
+bool WAYLIB_PREFIXED(window_configure_surface)(
 	WAYLIB_PREFIXED(window)* window,
 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
 	WAYLIB_PREFIXED(surface_configuration) config
@@ -171,7 +171,7 @@ void WAYLIB_PREFIXED(window_configure_surface)(
 #endif
 );
 
-void WAYLIB_PREFIXED(window_reconfigure_surface_on_resize)(
+bool WAYLIB_PREFIXED(window_reconfigure_surface_on_resize)(
 	WAYLIB_PREFIXED(window)* window,
 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
 	WAYLIB_PREFIXED(surface_configuration) config

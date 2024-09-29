@@ -18,15 +18,16 @@ WAYLIB_BEGIN_NAMESPACE
 
 		static struct window create(vec2u size, std::string_view name = "Waylib", window_config config = {});
 
-		bool should_close(bool poll_events = true) const {
+		inline bool should_close(bool poll_events = true) const {
 			if(poll_events) glfw::pollEvents();
 			return raw.shouldClose();
 		}
 
-		vec2u get_dimensions() const {
+		inline vec2u get_dimensions() const {
 			vec2u out; std::tie(out.x, out.y) = raw.getSize();
 			return out;
 		}
+		inline vec2u get_size() const { return get_dimensions(); }
 
 		wgpu::Surface get_surface(WGPUInstance instance) const {
 			return glfwCreateWindowWGPUSurface(instance, raw);
@@ -39,15 +40,16 @@ WAYLIB_BEGIN_NAMESPACE
 			return partial;
 		} WAYLIB_CATCH
 
-		void configure_surface(wgpu_state& state, surface_configuration config = {}) const {
-			state.configure_surface(get_dimensions(), config);
+		inline result<void> configure_surface(wgpu_state& state, surface_configuration config = {}) const {
+			return state.configure_surface(get_dimensions(), config);
 		}
 
-		void reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
+		result<void> reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
 			raw.sizeEvent.append([&state, config](glfw::Window&, int x, int y){
 				state.configure_surface({x, y}, config);
 			});
-			if(config.automatic_should_configure_now) configure_surface(state, config);
+			if(config.automatic_should_configure_now) return configure_surface(state, config);
+			return result<void>::success;
 		}
 
 	};
