@@ -148,10 +148,10 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
-	template<typename F>
-	auto closure2function_pointer(F _f) {
+	template<typename F, typename... Args>
+	auto closure2function_pointer(const F& _f, Args...) {
 		static F f = _f;
-		return +[]{ f(); };
+		return +[](Args... args){ f(std::forward<Args>(args)...); };
 	}
 
 	// Creates a c-string from a string view

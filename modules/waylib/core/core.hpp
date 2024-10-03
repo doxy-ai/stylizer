@@ -13,6 +13,8 @@
 #include <cstdint>
 #include <sstream>
 #include <filesystem>
+#include <cstring>
+#include <utility>
 
 
 WAYLIB_BEGIN_NAMESPACE
@@ -215,6 +217,190 @@ WAYLIB_BEGIN_NAMESPACE
 
 
 //////////////////////////////////////////////////////////////////////
+// # GPU Buffer (Generic)
+//////////////////////////////////////////////////////////////////////
+
+
+	struct gpu_buffer: public gpu_bufferC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(gpu_buffer)
+		gpu_buffer(gpu_buffer&& other) { *this = std::move(other); }
+		gpu_buffer& operator=(gpu_buffer&& other) {
+			size = std::exchange(other.size, 0);
+			offset = std::exchange(other.offset, 0);
+			cpu_data = std::exchange(other.cpu_data, nullptr);
+			data = std::exchange(other.data, nullptr);
+			label = std::exchange(other.label, nullptr);
+			return *this;
+		}
+		operator bool() const { return data; }
+
+		result<void> upload(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false) WAYLIB_TRY {
+			if(data == nullptr) {
+				data = state.device.createBuffer(WGPUBufferDescriptor {
+					.label = label ? *label : "Generic Waylib Buffer",
+					.usage = usage,
+					.size = offset + size,
+					.mappedAtCreation = false,
+				});
+				if(*cpu_data) state.device.getQueue().writeBuffer(data, offset, *cpu_data, size);
+			} else if(*cpu_data) state.device.getQueue().writeBuffer(data, offset, *cpu_data, size);
+
+			if(free_cpu_data && cpu_data) delete[] *cpu_data;
+			return result<void>::success;
+		} WAYLIB_CATCH
+		inline std::future<result<void>> upload_async(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this](wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage, bool free) {
+				return upload(state, usage, free);
+			}, initial_pool_size, state, usage, free_cpu_data);
+		}
+
+		static result<gpu_buffer> create(wgpu_state& state, std::span<std::byte> data, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, WAYLIB_OPTIONAL(std::string_view) label = {}) {
+			auto out_ = gpu_bufferC{
+				.size = data.size(),
+				.offset = 0,
+				.cpu_data = (uint8_t*)data.data(),
+				.data = nullptr,
+				.label = label.has_value ? cstring_from_view(label.value) : nullptr
+			};
+			auto out = *(gpu_buffer*)&out_;
+			if(auto res = out.upload(state, usage, false); !res) return unexpected(res.error());
+			return out;
+		}
+
+		template<typename T>
+		static result<gpu_buffer> create(wgpu_state& state, std::span<T> data, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, WAYLIB_OPTIONAL(std::string_view) label = {}) {
+			return create(state, {(std::byte*)data.data(), data.size() * sizeof(T)}, usage, label);
+		}
+
+
+		void release() {
+			if(cpu_data) delete[] *cpu_data;
+			if(data) data.release();
+			if(label) delete[] *label;
+		}
+
+	protected:
+		void map_impl(wgpu_state& state, WGPUMapMode mode) const {
+			if(mode != wgpu::MapMode::None) {
+				bool done = false;
+#ifdef __EMSCRIPTEN__
+				wgpuBufferMapAsync(data, mode, offset, size, closure2function_pointer([&done](wgpu::BufferMapAsyncStatus status, void* userdata) {
+					done = true;
+				}, WGPUBufferMapAsyncStatus{}, (void*)nullptr), nullptr);
+#else
+				auto future = const_cast<wgpu::Buffer*>(&data)->mapAsync2(mode, offset, size, WGPUBufferMapCallbackInfo2{
+					.mode = wgpu::CallbackMode::AllowSpontaneous,
+					.callback = closure2function_pointer([&done](wgpu::MapAsyncStatus status, char const * message, void* userdata1, void* userdata2) {
+						done = true;
+					}, WGPUMapAsyncStatus{}, (const char*)nullptr, (void*)nullptr, (void*)nullptr)
+				});
+#endif
+				while(!done) state.instance.processEvents();
+			}
+		}
+
+	public:
+		void* map_writable(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) {
+			map_impl(state, mode);
+			return data.getMappedRange(offset, size);
+		}
+		const void* map(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) const {
+			map_impl(state, mode);
+			return const_cast<wgpu::Buffer*>(&data)->getConstMappedRange(offset, size);
+		}
+
+
+		template<typename T>
+		inline T& map_wriable(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) {
+			assert(size == sizeof(T));
+			return *(T*)map_writable(state, mode);
+		}
+		template<typename T>
+		inline const T& map(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) const {
+			assert(size == sizeof(T));
+			return *(T*)map(state, mode);
+		}
+
+		template<typename T>
+		inline std::span<T> map_writable_span(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) {
+			assert((size % sizeof(T)) == 0);
+			return {(T*)map_writable(state, mode), size / sizeof(T)};
+		}
+		template<typename T>
+		inline std::span<const T> map_span(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) const {
+			assert((size % sizeof(T)) == 0);
+			return {(const T*)map(state, mode), size / sizeof(T)};
+		}
+
+		template<typename T>
+		inline T& map_cpu_data() {
+			assert(size == sizeof(T));
+			assert(cpu_data);
+			return *(T*)*cpu_data;
+		}
+		template<typename T>
+		inline std::span<T> map_cpu_data_span() {
+			assert((size % sizeof(T)) == 0);
+			assert(cpu_data);
+			return {(T*)*cpu_data, size / sizeof(T)};
+		}
+
+		void unmap() { data.unmap(); }
+
+		void copy_record_existing(WGPUCommandEncoder encoder, const gpu_buffer& source) {
+			static_cast<wgpu::CommandEncoder>(encoder).copyBufferToBuffer(source.data, source.offset, data, offset, size);
+		}
+
+		result<void> copy(wgpu_state& state, const gpu_buffer& source) WAYLIB_TRY {
+			auto encoder = state.device.createCommandEncoder();
+			copy_record_existing(encoder, source);
+			auto commands = encoder.finish();
+			state.device.getQueue().submit(commands);
+			commands.release();
+			encoder.release();
+			return result<void>::success;
+		} WAYLIB_CATCH
+		inline std::future<result<void>> copy_async(wgpu_state& state, const gpu_buffer& source, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this](wgpu_state& state, const gpu_buffer& source) {
+				return copy(state, source);
+			}, initial_pool_size, state, source);
+		}
+
+		// You must clear a landing pad for the data (set cpu_data to null) before calling this function
+		result<void> download(wgpu_state& state, bool create_intermediate_gpu_buffer = true) WAYLIB_TRY {
+			assert(*cpu_data == nullptr);
+			if(create_intermediate_gpu_buffer) {
+				struct gpu_bufferC out_{
+					.size = size,
+					.offset = 0,
+					.label = "Intermediate"
+				};
+				auto out = *(gpu_buffer*)&out_;
+				if(auto res = out.upload(state, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead); !res) return unexpected(res.error());
+				if(auto res = out.copy(state, *this); !res) return unexpected(res.error());
+				if(auto res = out.download(state, false); !res) return unexpected(res.error());
+				cpu_data = std::exchange(out.cpu_data, nullptr);
+				out.release();
+			} else {
+				cpu_data = {true, new uint8_t[size]};
+				auto src = map(state, wgpu::MapMode::Read); // TODO: Failing to map?
+				if(!src) return unexpected("Failed to map buffer");
+				memcpy(*cpu_data, src, size);
+				unmap();
+			}
+			return result<void>::success;
+		} WAYLIB_CATCH
+		inline std::future<result<void>> download_async(wgpu_state& state, bool create_intermediate_gpu_buffer = true, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this](wgpu_state& state, bool create_intermediate_gpu_buffer) {
+				return download(state, create_intermediate_gpu_buffer);
+			}, initial_pool_size, state, create_intermediate_gpu_buffer);
+		}
+
+		// TODO: Add gpu_buffer->image and image->gpu_buffer functions
+	};
+
+
+//////////////////////////////////////////////////////////////////////
 // # Gbuffer
 //////////////////////////////////////////////////////////////////////
 
@@ -321,8 +507,7 @@ WAYLIB_BEGIN_NAMESPACE
 				out.barycentric().maybe_create_view();
 			}
 			return out;
-		// } WAYLIB_CATCH
-		} catch(const std::exception& e) { return unexpected(std::string(e.what())); }
+		} WAYLIB_CATCH
 
 
 		void release() {
@@ -395,25 +580,27 @@ WAYLIB_BEGIN_NAMESPACE
 			release();
 
 			return std::array<wgpu::CommandBuffer, 2>{commands, render_commands};
-		// } WAYLIB_CATCH
-		} catch(const std::exception& e) { return unexpected(std::string(e.what())); }
+		} WAYLIB_CATCH
 
-		std::future<result<void>> draw_recordered(const std::array<wgpu::CommandBuffer, 2>& commands) {
-			return thread_pool::enqueue([&commands, this]() -> result<void> {
-				WAYLIB_TRY {
-					state().device.getQueue().submit(commands.size(), commands.data());
-					for(auto& command: commands)
-						const_cast<wgpu::CommandBuffer*>(&command)->release();
-					return result<void>::success;
-				// } WAYLIB_CATCH
-				} catch(const std::exception& e) { return unexpected(std::string(e.what())); }
-			});
+		result<void> draw_recordered(const std::array<wgpu::CommandBuffer, 2>& commands) WAYLIB_TRY {
+			state().device.getQueue().submit(commands.size(), commands.data());
+			for(auto& command: commands)
+				const_cast<wgpu::CommandBuffer*>(&command)->release();
+			return result<void>::success;
+		} WAYLIB_CATCH
+		inline std::future<result<void>> draw_recordered_async(const std::array<wgpu::CommandBuffer, 2>& commands, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this](const std::array<wgpu::CommandBuffer, 2>& commands) {
+				return draw_recordered(commands);
+			}, initial_pool_size, commands);
 		}
 
-		std::future<result<void>> draw() {
+		result<void> draw() {
 			auto commands = record_draw_commands();
-			if(!commands) return value2future<result<void>>(unexpected(commands.error()));
+			if(!commands) return unexpected(commands.error());
 			return draw_recordered(*commands);
+		}
+		inline std::future<result<void>> draw_async(WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this]() { return draw(); }, initial_pool_size);
 		}
 	};
 
@@ -467,9 +654,15 @@ WAYLIB_BEGIN_NAMESPACE
 			shaderDesc.label = config.name;
 
 			// We use the extension mechanism to specify the WGSL part of the shader module descriptor
+#ifdef __EMSCRIPTEN__
+			wgpu::ShaderModuleWGSLDescriptor shaderCodeSource;
+			shaderCodeSource.chain.next = nullptr;
+			shaderCodeSource.chain.sType = wgpu::SType::ShaderModuleWGSLDescriptor;
+#else
 			wgpu::ShaderSourceWGSL shaderCodeSource;
 			shaderCodeSource.chain.next = nullptr;
 			shaderCodeSource.chain.sType = wgpu::SType::ShaderSourceWGSL;
+#endif
 			shaderDesc.nextInChain = &shaderCodeSource.chain;
 			if(config.preprocessor) {
 				auto res = config.preprocessor->process_from_memory(wgsl_source_code, {
@@ -505,6 +698,145 @@ WAYLIB_BEGIN_NAMESPACE
 			WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout = {},
 			wgpu::RenderPipelineDescriptor pipelineDesc = {}
 		);
+	};
+
+
+//////////////////////////////////////////////////////////////////////
+// # Computer
+//////////////////////////////////////////////////////////////////////
+
+	struct computer: public computerC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(computer)
+		computer(computer&& other) { *this = std::move(other); }
+		computer& operator=(computer&& other) {
+			buffer_count = std::exchange(other.buffer_count, 0);
+			computerC::buffers = std::exchange(other.computerC::buffers, nullptr);
+			texture_count = std::exchange(other.texture_count, 0);
+			computerC::textures = std::exchange(other.computerC::textures, nullptr);
+			computerC::shader = std::exchange(other.computerC::shader, nullptr);
+			pipeline = std::exchange(other.pipeline, nullptr);
+			return *this;
+		}
+		operator bool() const { return pipeline; }
+		std::span<gpu_buffer> buffers() { return {(gpu_buffer*)*computerC::buffers, buffer_count}; }
+		std::span<texture> textures() { return {(texture*)*computerC::textures, texture_count}; }
+		struct shader& shader() { assert(computerC::shader.value); return *(struct shader*)*computerC::shader; }
+
+		struct recording_state {
+			WAYLIB_C_OR_CPP_TYPE(WGPUComputePassEncoder, wgpu::ComputePassEncoder) pass;
+			WAYLIB_C_OR_CPP_TYPE(WGPUBindGroup, wgpu::BindGroup) buffer_bind_group, texture_bind_group;
+
+			void release() {
+				if(pass) pass.release();
+				if(buffer_bind_group) buffer_bind_group.release();
+				if(texture_bind_group) texture_bind_group.release();
+			}
+		};
+
+		result<void> upload(wgpu_state& state, WAYLIB_OPTIONAL(std::string_view) label = {}) WAYLIB_TRY {
+			wgpu::ComputePipelineDescriptor computePipelineDesc = wgpu::Default;
+			computePipelineDesc.label = label ? cstring_from_view(*label) : "Waylib Compute Pipeline";
+			computePipelineDesc.compute.module = shader().module;
+			computePipelineDesc.compute.entryPoint = *shader().compute_entry_point;
+
+			if(pipeline) pipeline.release();
+			pipeline = state.device.createComputePipeline(computePipelineDesc);
+			return result<void>::success;
+		} WAYLIB_CATCH
+
+		void release() {
+			if(computerC::buffers) delete[] *computerC::buffers;
+			if(computerC::textures) delete[] *computerC::textures;
+			if(*computerC::shader) {
+				shader().release();
+				if(computerC::shader) delete computerC::shader.value;
+			}
+			if(pipeline) pipeline.release();
+		}
+
+		result<recording_state> dispatch_record_existing(wgpu_state& state, WGPUCommandEncoder encoder, vec3u workgroups, WAYLIB_OPTIONAL(WGPUComputePassEncoder) existing_pass = {}, bool end_pass = true) WAYLIB_TRY {
+			wgpu::BindGroup bufferBindGroup = nullptr, textureBindGroup = nullptr;
+			std::vector<wgpu::BindGroupEntry> bufferEntries, textureEntries;
+
+			if(buffer_count) {
+				bufferEntries = std::vector<wgpu::BindGroupEntry>(buffer_count, wgpu::Default); // TODO: Why does std::vector except?
+				for(size_t i = 0; i < buffer_count; ++i) {
+					bufferEntries[i].binding = i;
+					bufferEntries[i].buffer = buffers()[i].data;
+					bufferEntries[i].offset = buffers()[i].offset;
+					bufferEntries[i].size = buffers()[i].size;
+				}
+				bufferBindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
+					.label = "Waylib Compute Buffer Bind Group",
+					.layout = pipeline.getBindGroupLayout(0),
+					.entryCount = bufferEntries.size(),
+					.entries = bufferEntries.data()
+				});
+			}
+
+			if(texture_count) {
+				textureEntries = std::vector<wgpu::BindGroupEntry>(texture_count /* * 2*/, wgpu::Default);
+				for(size_t i = 0; i < texture_count; ++i) {
+					textureEntries[i].binding = i;
+					textureEntries[i].textureView = textures()[i].view;
+				}
+				textureBindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
+					.label = "Waylib Compute Texture Bind Group",
+					.layout = pipeline.getBindGroupLayout(1),
+					.entryCount = textureEntries.size(),
+					.entries = textureEntries.data()
+				});
+			}
+
+			wgpu::ComputePassEncoder pass = existing_pass ? static_cast<wgpu::ComputePassEncoder>(*existing_pass) : static_cast<wgpu::CommandEncoder>(encoder).beginComputePass();
+			{
+				pass.setPipeline(pipeline);
+				if(bufferBindGroup) pass.setBindGroup(0, bufferBindGroup, 0, nullptr);
+				if(textureBindGroup) pass.setBindGroup(1, textureBindGroup, 0, nullptr);
+				pass.dispatchWorkgroups(workgroups.x, workgroups.y, workgroups.z);
+			}
+			if(end_pass) pass.end();
+			return recording_state{pass, bufferBindGroup, textureBindGroup};
+		} WAYLIB_CATCH
+
+		result<void> dispatch(wgpu_state& state, vec3u workgroups) WAYLIB_TRY {
+			auto encoder = state.device.createCommandEncoder();
+			auto record_state = dispatch_record_existing(state, encoder, workgroups);
+			if(!record_state) return unexpected(record_state.error());
+
+			state.device.getQueue().submit(encoder.finish());
+
+			record_state->release();
+			encoder.release();
+			return result<void>::success;
+		} WAYLIB_CATCH
+		inline std::future<result<void>> dispatch_async(wgpu_state& state, vec3u workgroups, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this](wgpu_state& state, vec3u workgroups) {
+				return dispatch(state, workgroups);
+			}, initial_pool_size, state, workgroups);
+		}
+
+
+		// Warning: this function may deadlock the system, if a dispatch winds up on every thread of the threadpool and thus there is no room to launch the "real" dispatch thread
+		static result<void> dispatch(wgpu_state& state, std::span<gpu_buffer> gpu_buffers, std::span<texture> textures, struct shader& compute_shader, vec3u workgroups) WAYLIB_TRY {
+			computerC compute_ {
+				.buffer_count = (index_t)gpu_buffers.size(),
+				.buffers = gpu_buffers.data(),
+				.texture_count = (index_t)textures.size(),
+				.textures = textures.data(),
+				.shader = &compute_shader
+			};
+			auto compute = *(computer*)&compute_;
+			if(auto res = compute.upload(state); !res) return res;
+			auto res = compute.dispatch(state, workgroups);
+			compute.release();
+			return res;
+		} WAYLIB_CATCH
+		inline static std::future<result<void>> dispatch_async(wgpu_state& state, std::span<gpu_buffer> gpu_buffers, std::span<texture> textures, struct shader& compute_shader, vec3u workgroups, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([](wgpu_state& state, std::span<gpu_buffer> gpu_buffers, std::span<texture> textures, struct shader& compute_shader, vec3u workgroups) {
+				return dispatch(state, gpu_buffers, textures, compute_shader, workgroups);
+			}, initial_pool_size, state, gpu_buffers, textures, compute_shader, workgroups);
+		}
 	};
 
 
@@ -566,7 +898,11 @@ WAYLIB_BEGIN_NAMESPACE
 			// Keep a fragment only if its depth is lower than the previously blended one
 			depthStencilState.depthCompare = config.depth_function ? *config.depth_function : wgpu::CompareFunction::Undefined;
 			// Each frame_time a fragment is blended into the target, we update the value of the Z-buffer
+#ifdef __EMSCRIPTEN__
+			depthStencilState.depthWriteEnabled = config.depth_function;
+#else
 			depthStencilState.depthWriteEnabled = config.depth_function ? wgpu::OptionalBool::True : wgpu::OptionalBool::False;
+#endif
 			// Store the format in a variable as later parts of the code depend on it
 			depthStencilState.format = wgpu::TextureFormat::Depth24Plus; // TODO: make Gbuffer aware
 			// Deactivate the stencil altogether

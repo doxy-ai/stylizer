@@ -171,6 +171,14 @@ typedef struct {
 	;
 } WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC);
 
+typedef struct gpu_bufferC {
+	size_t size;
+	size_t offset;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(uint8_t*)) cpu_data;
+	WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) data;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) label;
+} WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC);
+
 typedef struct {
 	WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC) color, depth, normal;
 	WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)) ctl, masks, barycentric;
@@ -190,6 +198,16 @@ typedef struct {
 	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) fragment_entry_point;
 	WAYLIB_C_OR_CPP_TYPE(WGPUShaderModule, wgpu::ShaderModule) module;
 } WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC);
+
+typedef struct computerC {
+	index_t buffer_count;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
+	index_t texture_count;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)*)) textures;
+
+	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC)*) shader;
+	WAYLIB_C_OR_CPP_TYPE(WGPUComputePipeline, wgpu::ComputePipeline) pipeline;
+} WAYLIB_PREFIXED_C_CPP_TYPE(computer, computerC);
 
 // Material
 typedef struct {

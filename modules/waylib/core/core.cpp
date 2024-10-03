@@ -360,15 +360,14 @@ result<void> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONA
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
 	if(!draw) return unexpected(draw.error());
 	blit(*draw);
-	return draw->draw().get();
+	return draw->draw();
 }
 
 result<void> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
 	if(!draw) return unexpected(draw.error());
-	blit(*draw, blit_shader, false);
-	if(auto res = draw->draw(); !res) return unexpected(res.error());
-	return draw;
+	blit(*draw, blit_shader);
+	return draw->draw();
 }
 
 
