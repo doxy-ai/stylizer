@@ -14,15 +14,16 @@ endif()
 
 add_subdirectory(modules/waylib/core)
 add_subdirectory(modules/waylib/window)
-# add_subdirectory(modules/waylib/obj)
+add_subdirectory(modules/waylib/obj)
 
 add_executable(waylib_tests test.cpp)
-target_link_libraries(waylib_tests PUBLIC waylib::core waylib::window)
+target_link_libraries(waylib_tests PUBLIC waylib::core waylib::window waylib::obj)
 
 if(EMSCRIPTEN)
 	set_target_properties(waylib_tests PROPERTIES SUFFIX ".html")
-	# target_link_options(waylib_tests PUBLIC
-	# 	-fexceptions
-	# 	--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/resources@resources
-	# )
+	target_link_options(waylib_tests PUBLIC
+		# -fexceptions
+		# -sALLOW_MEMORY_GROWTH
+		--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/resources@resources
+	)
 endif()

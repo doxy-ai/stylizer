@@ -145,6 +145,7 @@ struct WAYLIB_PREFIXED(shader_preprocessor);
 //////////////////////////////////////////////////////////////////////
 
 
+// WGPU State
 typedef struct {
 	WAYLIB_C_OR_CPP_TYPE(WGPUInstance, wgpu::Instance) instance;
 	WAYLIB_C_OR_CPP_TYPE(WGPUAdapter, wgpu::Adapter) adapter;
@@ -160,6 +161,7 @@ typedef struct {
 	;
 } WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC);
 
+// Texture
 typedef struct {
 	// WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(image*)) image;
 	WAYLIB_C_OR_CPP_TYPE(WGPUTexture, wgpu::Texture) gpu_texture;
@@ -171,6 +173,7 @@ typedef struct {
 	;
 } WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC);
 
+// General Purpose GPU Buffer
 typedef struct gpu_bufferC {
 	size_t size;
 	size_t offset;
@@ -179,11 +182,12 @@ typedef struct gpu_bufferC {
 	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) label;
 } WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC);
 
+// Gbuffer
 typedef struct {
 	WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC) color, depth, normal;
-	WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)) ctl, masks, barycentric;
 } WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC);
 
+// Drawing State
 typedef struct {
 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state;
 	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) gbuffer;
@@ -199,7 +203,8 @@ typedef struct {
 	WAYLIB_C_OR_CPP_TYPE(WGPUShaderModule, wgpu::ShaderModule) module;
 } WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC);
 
-typedef struct computerC {
+// Computer
+typedef struct {
 	index_t buffer_count;
 	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
 	index_t texture_count;
@@ -223,15 +228,15 @@ typedef struct {
 	WAYLIB_PREFIXED(index_t) vertex_count;		// Number of vertices stored (length of each of the following arrays)
 
 	// Vertex attributes data
-	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED(vec3f)*) positions;						// Vertex position (shader-location = 0) NOTE: Not nullable
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec3f)*)) normals;		// Vertex normals (shader-location = 1)
+	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED(vec4f)*) positions;						// Vertex position (xyz) mask 1 (w) (shader-location = 0) NOTE: Not nullable
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) normals;		// Vertex normals (xyz) mask 2 (w) (shader-location = 1)
 	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) tangents;		// Vertex tangents (xyz) and sign (w) to compute bitangent (shader-location = 2)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec2f)*)) uvs;			// Vertex texture coordinates (shader-location = 3)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec2f)*)) uvs2;			// Vertex texture secondary (lightmap?) coordinates (shader-location = 4)
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) uvs;			// Vertex texture coordinates (xy) and (zw) (shader-location = 3)
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) cta;			// Vertex curvature (x), thickness (y), and associated faces begin (z) and length (z) (shader-location = 4)
 
 	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC))*)) colors;		// Vertex colors (shader-location = 5)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) ctl;			// Vertex curvature (x), thickness (y), and baked lighting (z) (shader-location = 6)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) masks;			// Vertex masks (shader-location = 7)
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4u)*)) bones;			// Bone IDs (shader-location = 6)
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) bone_weights;	// Bone weights associated with each ID (shader-location = 7)
 
 	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(index_t)*)) indices;		// Vertex indices (in case vertex data comes indexed)
 
@@ -242,9 +247,29 @@ typedef struct {
 	// vec4u* bone_ids;			// Vertex bone ids, max 255 bone ids, up to 4 bones influence by vertex (skinning)
 	// vec4f* bone_weights;		// Vertex bone weight, up to 4 bones influence by vertex (skinning)
 
-	WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) buffer; // Pointer to the data on the gpu
-	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer)) index_buffer; // Pointer to the index data on the gpu
+	WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) vertex_buffer, transformed_vertex_buffer; // Pointer to the data on the gpu
+	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer)) index_buffer, transformed_index_buffer; // Pointer to the index data on the gpu
 } WAYLIB_PREFIXED_C_CPP_TYPE(mesh, meshC);
+
+// Mesh Metadata
+typedef struct {
+	bool32 is_indexed;
+	uint32_t vertex_count;
+	uint32_t triangle_count;
+
+
+	uint32_t position_start;
+	uint32_t normals_start;
+	uint32_t tangents_start;
+	uint32_t uvs_start;
+	uint32_t cta_start;
+
+	uint32_t colors_start;
+	uint32_t bones_start;
+	uint32_t bone_weights_start;
+
+	uint32_t vertex_buffer_size;
+} WAYLIB_PREFIXED(mesh_metadata);
 
 // Model, meshes, materials and animation data
 // From: raylib.h
@@ -261,6 +286,17 @@ typedef struct {
 	// WAYLIB_PREFIXED(index_t) bone_count;			// Number of bones
 	// bone_info* bones;			// Bones information (skeleton)
 } WAYLIB_PREFIXED_C_CPP_TYPE(model, modelC);
+
+// Model Instance Data
+typedef struct {
+	WAYLIB_PREFIXED(mat4x4f) transform;
+	WAYLIB_PREFIXED(mat4x4f) inverse_transform;
+	WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC) tint
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= {1, 1, 1, 1}
+#endif
+	;
+} WAYLIB_PREFIXED(model_instance_data);
 
 
 //////////////////////////////////////////////////////////////////////
@@ -296,18 +332,6 @@ typedef struct {
 	; WGPUTextureFormat normal_format
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureFormat::RGBA16Float
-#endif
-	; WGPUTextureFormat ctl_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
-		= wgpu::TextureFormat::Undefined // wgpu::TextureFormat::RGBA32Float;
-#endif
-	; WGPUTextureFormat mask_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
-		= wgpu::TextureFormat::Undefined // wgpu::TextureFormat::RGBA32Float;
-#endif
-	; WGPUTextureFormat barycentric_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
-		= wgpu::TextureFormat::Undefined // wgpu::TextureFormat::RGBA8Unorm;
 #endif
 	;
 } WAYLIB_PREFIXED(Gbuffer_config);

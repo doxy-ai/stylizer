@@ -111,7 +111,7 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 #ifdef __cpp_exceptions
 				throw exception(s.str());
 #else // __cpp_exceptions
-				errros::set(s.str());
+				errors::set(s.str());
 #endif // __cpp_exceptions
 			}
 		}
@@ -235,7 +235,8 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	static texture depthTexture = {};
 	depthTextureDesc.size = {gpu_texture.getWidth(), gpu_texture.getHeight(), 1};
-	if(!depthTexture.gpu_texture || (depthTexture.gpu_texture.getWidth() != depthTextureDesc.size.width && depthTexture.gpu_texture.getHeight() != depthTextureDesc.size.height)) {
+	if(!depthTexture.gpu_texture || depthTexture.size() != size()) {
+		if(depthTexture.gpu_texture) depthTexture.gpu_texture.release();
 		depthTexture.gpu_texture = state.device.createTexture(depthTextureDesc);
 		depthTexture.maybe_create_view(wgpu::TextureAspect::DepthOnly);
 	}
@@ -333,10 +334,10 @@ struct vertex_output {
 fn vertex(@builtin(vertex_index) vertex_index: u32) -> vertex_output {
 	switch vertex_index {
 		case 0u: {
-			return vertex_output(vec4f(-1.0, -3.0, .99, 1.0), vec2f(0.0, 1.5));
+			return vertex_output(vec4f(-1.0, -3.0, .99, 1.0), vec2f(0.0, 2.0));
 		}
 		case 1u: {
-			return vertex_output(vec4f(3.0, 1.0, .99, 1.0), vec2f(1.5, 0.0));
+			return vertex_output(vec4f(3.0, 1.0, .99, 1.0), vec2f(2.0, 0.0));
 		}
 		case 2u, default: {
 			return vertex_output(vec4f(-1.0, 1.0, .99, 1.0), vec2f(0.0));
@@ -446,7 +447,7 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> shader::configure_render_pipeline_descriptor(
 	wgpu_state& state,
-	std::span<WGPUColorTargetState> gbuffer_targets,
+	std::span<const WGPUColorTargetState> gbuffer_targets,
 	WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout /* = {} */,
 	wgpu::RenderPipelineDescriptor pipelineDesc /* = {} */
 ) {

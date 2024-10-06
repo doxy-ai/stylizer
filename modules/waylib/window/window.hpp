@@ -52,6 +52,14 @@ WAYLIB_BEGIN_NAMESPACE
 			return result<void>::success;
 		}
 
+		template<GbufferTargetProvider Tgbuffer>
+		window& auto_resize_gbuffer(wgpu_state& state, Tgbuffer& gbuffer) {
+			raw.sizeEvent.append([&state, &gbuffer](glfw::Window&, int x, int y){
+				gbuffer.resize(state, {x, y});
+			});
+			return *this;
+		}
+
 	};
 
 	template<>

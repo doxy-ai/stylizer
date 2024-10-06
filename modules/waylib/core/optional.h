@@ -33,8 +33,8 @@
 		operator bool() const noexcept { return has_value; }
 		T& operator*() noexcept{ return value; }
 		const T& operator*() const noexcept { return value; }
-		T* operator->() noexcept { return &value; }
-		const T* operator->() const noexcept { return &value; }
+		std::remove_reference_t<T>* operator->() noexcept { return &value; }
+		const std::remove_reference_t<T>* operator->() const noexcept { return &value; }
 	};
 	#ifdef WAYLIB_NAMESPACE_NAME
 		#define WAYLIB_OPTIONAL(type) WAYLIB_NAMESPACE_NAME::optional<type>

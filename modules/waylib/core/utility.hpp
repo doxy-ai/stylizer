@@ -25,10 +25,12 @@ WAYLIB_BEGIN_NAMESPACE
 
 	#define WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(type)\
 		using type ## C::type ## C;\
+		inline type ## C& c() { return *this; }\
 		type() {}\
 		type(const type&) = default;\
 		type& operator=(const type&) = default;\
 		type(type ## C&& c) : type ## C(std::move(c)) {}
+
 
 //////////////////////////////////////////////////////////////////////
 // # Error Handling

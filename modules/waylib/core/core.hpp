@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <cstring>
 #include <utility>
+#include <concepts>
 
 
 WAYLIB_BEGIN_NAMESPACE
@@ -130,6 +131,7 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 		operator bool() const { return gpu_texture; }
 		wgpu::TextureFormat format() { return gpu_texture.getFormat(); }
+		vec2u size() { return {gpu_texture.getWidth(), gpu_texture.getHeight()}; }
 
 		void release() {
 			if(gpu_texture) gpu_texture.release();
@@ -192,8 +194,7 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 
 		result<void> maybe_create_view(wgpu::TextureAspect aspect = wgpu::TextureAspect::All) WAYLIB_TRY {
-			if(view) return result<void>::success;
-
+			if(view) view.release();
 			view = gpu_texture.createView(WGPUTextureViewDescriptor{
 				.format = format(),
 				.dimension = wgpu::TextureViewDimension::_2D,
@@ -234,13 +235,13 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 		operator bool() const { return data; }
 
-		result<void> upload(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false) WAYLIB_TRY {
+		result<void> upload(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, bool mapped_at_creation = false) WAYLIB_TRY {
 			if(data == nullptr) {
 				data = state.device.createBuffer(WGPUBufferDescriptor {
 					.label = label ? *label : "Generic Waylib Buffer",
 					.usage = usage,
 					.size = offset + size,
-					.mappedAtCreation = false,
+					.mappedAtCreation = mapped_at_creation,
 				});
 				if(*cpu_data) state.device.getQueue().writeBuffer(data, offset, *cpu_data, size);
 			} else if(*cpu_data) state.device.getQueue().writeBuffer(data, offset, *cpu_data, size);
@@ -248,10 +249,10 @@ WAYLIB_BEGIN_NAMESPACE
 			if(free_cpu_data && cpu_data) delete[] *cpu_data;
 			return result<void>::success;
 		} WAYLIB_CATCH
-		inline std::future<result<void>> upload_async(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
-			return thread_pool::enqueue([this](wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage, bool free) {
-				return upload(state, usage, free);
-			}, initial_pool_size, state, usage, free_cpu_data);
+		inline std::future<result<void>> upload_async(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, bool mapped_at_creation = false, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
+			return thread_pool::enqueue([this](wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage, bool free, bool map) {
+				return upload(state, usage, free, map);
+			}, initial_pool_size, state, usage, free_cpu_data, mapped_at_creation);
 		}
 
 		static result<gpu_buffer> create(wgpu_state& state, std::span<std::byte> data, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, WAYLIB_OPTIONAL(std::string_view) label = {}) {
@@ -272,11 +273,26 @@ WAYLIB_BEGIN_NAMESPACE
 			return create(state, {(std::byte*)data.data(), data.size() * sizeof(T)}, usage, label);
 		}
 
-
 		void release() {
 			if(cpu_data) delete[] *cpu_data;
-			if(data) data.release();
+			if(data) {
+				data.destroy();
+				data.release();
+			}
 			if(label) delete[] *label;
+		}
+
+		static gpu_buffer zero_buffer(wgpu_state& state, size_t minimum_size /* = 0 */) {
+			static gpu_buffer zeroBuffer = {};
+
+			if(!zeroBuffer || minimum_size > zeroBuffer.size) {
+				zeroBuffer.size = minimum_size;
+				std::vector<std::byte> zeroData(zeroBuffer.size, std::byte{0});
+				if(zeroBuffer) zeroBuffer.release();
+				auto res = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage | wgpu::BufferUsage::Uniform | wgpu::BufferUsage::Vertex);
+				zeroBuffer = *res;
+			}
+			return zeroBuffer;
 		}
 
 	protected:
@@ -409,20 +425,14 @@ WAYLIB_BEGIN_NAMESPACE
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(Gbuffer)
 		Gbuffer(Gbuffer&& other) { *this = std::move(other); }
 		Gbuffer& operator=(Gbuffer&& other) {
-			GbufferC::color = std::exchange(other.GbufferC::color, {});
-			GbufferC::depth = std::exchange(other.GbufferC::depth, {});
-			GbufferC::normal = std::exchange(other.GbufferC::normal, {});
-			GbufferC::ctl = std::exchange(other.GbufferC::ctl, {});
-			GbufferC::masks = std::exchange(other.GbufferC::masks, {});
-			GbufferC::barycentric = std::exchange(other.GbufferC::barycentric, {});
+			c().color = std::exchange(other.c().color, {});
+			c().depth = std::exchange(other.c().depth, {});
+			c().normal = std::exchange(other.c().normal, {});
 			return *this;
 		}
-		texture& color() { return *(texture*)&(GbufferC::color); }
-		texture& depth() { return *(texture*)&(GbufferC::depth); }
-		texture& normal() { return *(texture*)&(GbufferC::normal); }
-		texture& ctl() { return *(texture*)&(GbufferC::ctl); }
-		texture& masks() { return *(texture*)&(GbufferC::masks); }
-		texture& barycentric() { return *(texture*)&(GbufferC::barycentric); }
+		texture& color() { return *(texture*)&(c().color); }
+		texture& depth() { return *(texture*)&(c().depth); }
+		texture& normal() { return *(texture*)&(c().normal); }
 		operator bool() { return color() && depth() && normal(); }
 
 		static result<Gbuffer> create_default(wgpu_state& state, vec2u size, Gbuffer_config config = {}) WAYLIB_TRY {
@@ -465,74 +475,27 @@ WAYLIB_BEGIN_NAMESPACE
 				.viewFormats = &config.normal_format
 			});
 			out.normal().maybe_create_view();
-			if(config.ctl_format != wgpu::TextureFormat::Undefined) {
-				out.ctl().gpu_texture = state.device.createTexture(WGPUTextureDescriptor {
-					.label = "Waylib Curvature, Thickness, Lighting Buffer",
-					.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
-					.dimension = wgpu::TextureDimension::_2D,
-					.size = {size.x, size.y, 1},
-					.format = config.ctl_format,
-					.mipLevelCount = 1,
-					.sampleCount = 1,
-					.viewFormatCount = 1,
-					.viewFormats = &config.ctl_format
-				});
-				out.ctl().maybe_create_view();
-			}
-			if(config.mask_format != wgpu::TextureFormat::Undefined) {
-				out.masks().gpu_texture = state.device.createTexture(WGPUTextureDescriptor {
-					.label = "Waylib Mask Buffer",
-					.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
-					.dimension = wgpu::TextureDimension::_2D,
-					.format = config.mask_format,
-					.mipLevelCount = 1,
-					.sampleCount = 1,
-					.viewFormatCount = 1,
-					.viewFormats = &config.mask_format
-				});
-				out.masks().maybe_create_view();
-			}
-			if(config.barycentric_format != wgpu::TextureFormat::Undefined) {
-				out.barycentric().gpu_texture = state.device.createTexture(WGPUTextureDescriptor {
-					.label = "Waylib Barycentric Buffer",
-					.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
-					.dimension = wgpu::TextureDimension::_2D,
-					.size = {size.x, size.y, 1},
-					.format = config.barycentric_format,
-					.mipLevelCount = 1,
-					.sampleCount = 1,
-					.viewFormatCount = 1,
-					.viewFormats = &config.barycentric_format
-				});
-				out.barycentric().maybe_create_view();
-			}
 			return out;
 		} WAYLIB_CATCH
-
 
 		void release() {
 			if(color().gpu_texture) color().release();
 			if(depth().gpu_texture) depth().release();
 			if(normal().gpu_texture) normal().release();
-			if(ctl().gpu_texture) ctl().release();
-			if(masks().gpu_texture) masks().release();
-			if(barycentric().gpu_texture) barycentric().release();
+		}
+
+		std::array<WGPUColorTargetState, 2> targets() {
+			return std::array<WGPUColorTargetState, 2>{
+				color().default_color_target_state(),
+				normal().default_color_target_state(),
+			};
 		}
 
 		result<void> resize(wgpu_state& state, vec2u size) {
-			wgpu::TextureFormat ctlFormat = wgpu::TextureFormat::Undefined;
-			if(ctl().gpu_texture) ctlFormat = ctl().gpu_texture.getFormat();
-			wgpu::TextureFormat masksFormat = wgpu::TextureFormat::Undefined;
-			if(masks().gpu_texture) masksFormat = masks().gpu_texture.getFormat();
-			wgpu::TextureFormat barycentricFormat = wgpu::TextureFormat::Undefined;
-			if(barycentric().gpu_texture) barycentricFormat = barycentric().gpu_texture.getFormat();
 			auto _new = create_default(state, size, {
 				.color_format = color().gpu_texture.getFormat(),
 				.depth_format = depth().gpu_texture.getFormat(),
 				.normal_format = normal().gpu_texture.getFormat(),
-				.ctl_format = ctlFormat,
-				.mask_format = masksFormat,
-				.barycentric_format = barycentricFormat
 			});
 			if(!_new) return unexpected(_new.error());
 
@@ -542,6 +505,11 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 
 		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {});
+	};
+
+	template<typename Tgbuffer>
+	concept GbufferTargetProvider = requires(Tgbuffer gbuffer) {
+		{gbuffer.targets()} -> std::convertible_to<std::span<const WGPUColorTargetState>>; // TODO: Why is std::array not convertible to std::span?
 	};
 
 
@@ -559,8 +527,8 @@ WAYLIB_BEGIN_NAMESPACE
 			render_pass = std::exchange(other.render_pass, nullptr);
 			return *this;
 		}
-		wgpu_state& state() { return *(wgpu_state*)drawing_stateC::state; }
-		Gbuffer& gbuffer() { return *(Gbuffer*)drawing_stateC::gbuffer; }
+		wgpu_state& state() { return *(wgpu_state*)c().state; }
+		Gbuffer& gbuffer() { return *(Gbuffer*)c().gbuffer; }
 		operator bool() { return pre_encoder && render_encoder && render_pass; }
 
 		void release() {
@@ -694,7 +662,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 		std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> configure_render_pipeline_descriptor(
 			wgpu_state& state,
-			std::span<WGPUColorTargetState> gbuffer_targets,
+			std::span<const WGPUColorTargetState> gbuffer_targets,
 			WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout = {},
 			wgpu::RenderPipelineDescriptor pipelineDesc = {}
 		);
@@ -705,22 +673,23 @@ WAYLIB_BEGIN_NAMESPACE
 // # Computer
 //////////////////////////////////////////////////////////////////////
 
+
 	struct computer: public computerC {
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(computer)
 		computer(computer&& other) { *this = std::move(other); }
 		computer& operator=(computer&& other) {
 			buffer_count = std::exchange(other.buffer_count, 0);
-			computerC::buffers = std::exchange(other.computerC::buffers, nullptr);
+			c().buffers = std::exchange(other.c().buffers, nullptr);
 			texture_count = std::exchange(other.texture_count, 0);
-			computerC::textures = std::exchange(other.computerC::textures, nullptr);
-			computerC::shader = std::exchange(other.computerC::shader, nullptr);
+			c().textures = std::exchange(other.c().textures, nullptr);
+			c().shader = std::exchange(other.c().shader, nullptr);
 			pipeline = std::exchange(other.pipeline, nullptr);
 			return *this;
 		}
 		operator bool() const { return pipeline; }
-		std::span<gpu_buffer> buffers() { return {(gpu_buffer*)*computerC::buffers, buffer_count}; }
-		std::span<texture> textures() { return {(texture*)*computerC::textures, texture_count}; }
-		struct shader& shader() { assert(computerC::shader.value); return *(struct shader*)*computerC::shader; }
+		std::span<gpu_buffer> buffers() { return {(gpu_buffer*)*c().buffers, buffer_count}; }
+		std::span<texture> textures() { return {(texture*)*c().textures, texture_count}; }
+		struct shader& shader() { assert(c().shader.value); return *(struct shader*)*c().shader; }
 
 		struct recording_state {
 			WAYLIB_C_OR_CPP_TYPE(WGPUComputePassEncoder, wgpu::ComputePassEncoder) pass;
@@ -745,11 +714,11 @@ WAYLIB_BEGIN_NAMESPACE
 		} WAYLIB_CATCH
 
 		void release() {
-			if(computerC::buffers) delete[] *computerC::buffers;
-			if(computerC::textures) delete[] *computerC::textures;
-			if(*computerC::shader) {
+			if(c().buffers) delete[] *c().buffers;
+			if(c().textures) delete[] *c().textures;
+			if(*c().shader) {
 				shader().release();
-				if(computerC::shader) delete computerC::shader.value;
+				if(c().shader) delete c().shader.value;
 			}
 			if(pipeline) pipeline.release();
 		}
@@ -859,7 +828,7 @@ WAYLIB_BEGIN_NAMESPACE
 		// TODO: This function needs to become gbuffer aware
 		result<void> upload(
 			wgpu_state& state,
-			std::span<WGPUColorTargetState> gbuffer_targets,
+			std::span<const WGPUColorTargetState> gbuffer_targets,
 			WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout = {},
 			material_configuration config = {}
 		) {
@@ -923,6 +892,15 @@ WAYLIB_BEGIN_NAMESPACE
 			pipeline = state.device.createRenderPipeline(pipelineDesc);
 			return result<void>::success;
 		}
+		template<GbufferTargetProvider Tgbuffer>
+		result<void> upload(
+			wgpu_state& state,
+			Tgbuffer& gbuffer,
+			WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout = {},
+			material_configuration config = {}
+		) {
+			return upload(state, gbuffer.targets(), mesh_layout, config);
+		}
 	};
 
 
@@ -941,36 +919,38 @@ WAYLIB_BEGIN_NAMESPACE
 			normals = std::exchange(other.normals, nullptr);
 			tangents = std::exchange(other.tangents, nullptr);
 			uvs = std::exchange(other.uvs, nullptr);
-			uvs2 = std::exchange(other.uvs2, nullptr);
+			cta = std::exchange(other.cta, nullptr);
 			colors = std::exchange(other.colors, nullptr);
-			ctl = std::exchange(other.ctl, nullptr);
-			masks = std::exchange(other.masks, nullptr);
+			bones = std::exchange(other.bones, nullptr);
+			bone_weights = std::exchange(other.bone_weights, nullptr);
 			indices = std::exchange(other.indices, nullptr);
-			buffer = std::exchange(other.buffer, nullptr);
+			vertex_buffer = std::exchange(other.vertex_buffer, nullptr);
 			index_buffer = std::exchange(other.index_buffer, nullptr);
+			transformed_vertex_buffer = std::exchange(other.transformed_vertex_buffer, nullptr);
+			transformed_index_buffer = std::exchange(other.transformed_index_buffer, nullptr);
 			return *this;
 		}
 
 		static const std::array<WGPUVertexBufferLayout, 8>& mesh_layout() {
 			static WGPUVertexAttribute positionAttribute = {
-				.format = wgpu::VertexFormat::Float32x3,
+				.format = wgpu::VertexFormat::Float32x4,
 				.offset = 0,
 				.shaderLocation = 0,
 			};
 			static WGPUVertexBufferLayout positionLayout = {
-				.arrayStride = sizeof(vec3f),
+				.arrayStride = sizeof(vec4f),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
 				.attributes = &positionAttribute,
 			};
 
 			static WGPUVertexAttribute normalsAttribute = {
-				.format = wgpu::VertexFormat::Float32x3,
+				.format = wgpu::VertexFormat::Float32x4,
 				.offset = 0,
 				.shaderLocation = 1,
 			};
 			static WGPUVertexBufferLayout normalsLayout = {
-				.arrayStride = sizeof(vec3f),
+				.arrayStride = sizeof(vec4f),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
 				.attributes = &normalsAttribute,
@@ -989,27 +969,27 @@ WAYLIB_BEGIN_NAMESPACE
 			};
 
 			static WGPUVertexAttribute uvsAttribute = {
-				.format = wgpu::VertexFormat::Float32x2,
+				.format = wgpu::VertexFormat::Float32x4,
 				.offset = 0,
 				.shaderLocation = 3,
 			};
 			static WGPUVertexBufferLayout uvsLayout = {
-				.arrayStride = sizeof(vec2f),
+				.arrayStride = sizeof(vec4f),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
 				.attributes = &uvsAttribute,
 			};
 
-			static WGPUVertexAttribute uvs2Attribute = {
-				.format = wgpu::VertexFormat::Float32x2,
+			static WGPUVertexAttribute ctaAttribute = {
+				.format = wgpu::VertexFormat::Float32x4,
 				.offset = 0,
 				.shaderLocation = 4,
 			};
-			static WGPUVertexBufferLayout uvs2Layout = {
-				.arrayStride = sizeof(vec2f),
+			static WGPUVertexBufferLayout ctaLayout = {
+				.arrayStride = sizeof(vec4f),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
-				.attributes = &uvs2Attribute,
+				.attributes = &ctaAttribute,
 			};
 
 			static WGPUVertexAttribute colorsAttribute = {
@@ -1018,39 +998,97 @@ WAYLIB_BEGIN_NAMESPACE
 				.shaderLocation = 5,
 			};
 			static WGPUVertexBufferLayout colorsLayout = {
-				.arrayStride = sizeof(colorC),
+				.arrayStride = sizeof(vec4f),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
 				.attributes = &colorsAttribute,
 			};
 
-			static WGPUVertexAttribute ctlAttribute = {
-				.format = wgpu::VertexFormat::Float32x4,
+			static WGPUVertexAttribute bonesAttribute = {
+				.format = wgpu::VertexFormat::Uint32x4,
 				.offset = 0,
 				.shaderLocation = 6,
 			};
-			static WGPUVertexBufferLayout ctlLayout = {
-				.arrayStride = sizeof(vec4f),
+			static WGPUVertexBufferLayout bonesLayout = {
+				.arrayStride = sizeof(vec4u),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
-				.attributes = &ctlAttribute,
+				.attributes = &bonesAttribute,
 			};
 
-			static WGPUVertexAttribute masksAttribute = {
+			static WGPUVertexAttribute boneWeightsAttribute = {
 				.format = wgpu::VertexFormat::Float32x4,
 				.offset = 0,
 				.shaderLocation = 7,
 			};
-			static WGPUVertexBufferLayout masksLayout = {
+			static WGPUVertexBufferLayout boneWeightsLayout = {
 				.arrayStride = sizeof(vec4f),
 				.stepMode = wgpu::VertexStepMode::Vertex,
 				.attributeCount = 1,
-				.attributes = &masksAttribute,
+				.attributes = &boneWeightsAttribute,
 			};
 
-			static std::array<WGPUVertexBufferLayout, 8> layouts = {positionLayout, normalsLayout, tangentsLayout, uvsLayout, uvs2Layout, colorsLayout, ctlLayout, masksLayout};
+			static std::array<WGPUVertexBufferLayout, 8> layouts = {positionLayout, normalsLayout, tangentsLayout, uvsLayout, ctaLayout, colorsLayout, bonesLayout, boneWeightsLayout};
 			return layouts;
 		}
+
+		mesh_metadata metadata() {
+			mesh_metadata meta = {
+				.is_indexed = (bool)index_buffer,
+				.vertex_count = vertex_count,
+				.triangle_count = triangle_count,
+
+				.position_start = 0,
+				// Others should default to zero :)
+			};
+			size_t offset = vertex_count * sizeof(vec4f); // Account for position
+			if(*normals) (meta.normals_start = offset, offset += vertex_count * sizeof(vec4f));
+			if(*tangents) (meta.tangents_start = offset, offset += vertex_count * sizeof(vec4f));
+			if(*uvs) (meta.uvs_start = offset, offset += vertex_count * sizeof(vec4f));
+			if(*cta) (meta.cta_start = offset, offset += vertex_count * sizeof(vec4f));
+			if(*colors) (meta.colors_start = offset, offset += vertex_count * sizeof(vec4f));
+			if(*bones) (meta.bones_start = offset, offset += vertex_count * sizeof(vec4u));
+			if(*bone_weights) (meta.bone_weights_start = offset, offset += vertex_count * sizeof(vec4f));
+			meta.vertex_buffer_size = offset;
+			return meta;
+		}
+
+		result<void> upload(wgpu_state& state) WAYLIB_TRY {
+			// if(mesh.uvs && !mesh.tangents) mesh_generate_tangents(mesh);
+
+			if(vertex_buffer) vertex_buffer.release();
+			auto metadata = this->metadata();
+			size_t attribute_size = metadata.vertex_count * sizeof(vec4f);
+
+			gpu_buffer buffer = gpu_bufferC{
+				.size = metadata.vertex_buffer_size
+			};
+			buffer.upload(state, wgpu::BufferUsage::Vertex, false, true);
+			std::byte* mapped = (std::byte*)buffer.map_writable(state);
+
+			// Upload geometry data to the buffer
+			memcpy(mapped + metadata.position_start, *positions, attribute_size);
+			if(*normals) memcpy(mapped + metadata.normals_start, *normals, attribute_size);
+			if(*tangents) memcpy(mapped + metadata.tangents_start, *tangents, attribute_size);
+			if(*uvs) memcpy(mapped + metadata.uvs_start, *uvs, attribute_size);
+			if(*cta) memcpy(mapped + metadata.cta_start, *cta, attribute_size);
+			if(*colors) memcpy(mapped + metadata.colors_start, *colors, attribute_size);
+			if(*bones) memcpy(mapped + metadata.bones_start, *bones, attribute_size);
+			if(*bone_weights) memcpy(mapped + metadata.bone_weights_start, *bone_weights, attribute_size);
+			buffer.unmap();
+
+			result<gpu_buffer> indexBuffer = gpu_buffer{};
+			if(*indices)
+				indexBuffer = gpu_buffer::create(state, {(std::byte*)*indices, triangle_count * sizeof(index_t) * 3}, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index);
+			else if(index_buffer) index_buffer.release();
+			if(!indexBuffer) return wl::unexpected(indexBuffer.error());
+
+			if(vertex_buffer) vertex_buffer.release();
+			vertex_buffer = buffer.data;
+			if(index_buffer) index_buffer.release();
+			index_buffer = indexBuffer->data;
+			return wl::result<void>::success;
+		} WAYLIB_CATCH
 	};
 
 
@@ -1065,15 +1103,87 @@ WAYLIB_BEGIN_NAMESPACE
 		model& operator=(model&& other) {
 			transform = std::exchange(other.transform, glm::identity<glm::mat4x4>());
 			mesh_count = std::exchange(other.mesh_count, 0);
-			meshes = std::exchange(other.meshes, nullptr);
+			c().meshes = std::exchange(other.c().meshes, nullptr);
 			material_count = std::exchange(other.material_count, 0);
-			materials = std::exchange(other.materials, nullptr);
-			mesh_materials = std::exchange(other.mesh_materials, nullptr);
+			c().materials = std::exchange(other.c().materials, nullptr);
+			c().mesh_materials = std::exchange(other.c().mesh_materials, nullptr);
 			return *this;
 		}
-		std::span<mesh> meshes_span() { return {static_cast<mesh*>(meshes.value), mesh_count}; }
-		std::span<material> materials_span() { return {static_cast<material*>(materials.value), material_count}; }
-		std::span<index_t> mesh_materials_span() { return {static_cast<index_t*>(mesh_materials.value), mesh_count}; }
+		std::span<mesh> meshes() { return {static_cast<mesh*>(*c().meshes), mesh_count}; }
+		std::span<material> materials() { return {static_cast<material*>(*c().materials), material_count}; }
+		std::span<index_t> mesh_materials() { return {static_cast<index_t*>(*c().mesh_materials), mesh_count}; }
+
+		index_t get_material_index_for_mesh(index_t i) {
+			if(*c().mesh_materials == nullptr) return i;
+			return mesh_materials()[i];
+		}
+		material& get_material_for_mesh(index_t i) {
+			i = get_material_index_for_mesh(i);
+			assert(i < material_count);
+			return materials()[i];
+		}
+
+		result<void> upload(wgpu_state& state, std::span<const WGPUColorTargetState> gbuffer_targets) {
+			for(auto& mesh: meshes())
+				if(auto res = mesh.upload(state); !res) return res;
+			for(auto& material: materials())
+				if(auto res = material.upload(state, gbuffer_targets); !res) return res;
+			return result<void>::success;
+		}
+		template<GbufferTargetProvider Tgbuffer>
+		result<void> upload(wgpu_state& state, Tgbuffer& gbuffer) { return upload(state, gbuffer.targets()); }
+
+		result<void> draw_instanced(drawing_state& draw, std::span<model_instance_data> instances) WAYLIB_TRY {
+			// if(instances.size() > 0) {
+			// 	instanceBufferDesc.size = sizeof(model_instance_data) * instances.size();
+			// 	wgpu::Buffer instanceBuffer = frame.state.device.createBuffer(instanceBufferDesc); frame_defer(frame) { instanceBuffer.destroy(); instanceBuffer.release(); };
+			// 	// memcpy(instanceBuffer.getMappedRange(0, instanceBufferDesc.size), instances.data(), instanceBufferDesc.size);
+			// 	// instanceBuffer.unmap();
+			// 	frame.state.device.getQueue().writeBuffer(instanceBuffer, 0, instances.data(), sizeof(model_instance_data) * instances.size());
+			// 	frame_defer(frame) { instanceBuffer.destroy(); instanceBuffer.release(); };
+
+			// 	bindings[0].buffer = instanceBuffer;
+			// 	bindings[0].size = sizeof(model_instance_data) * instances.size();
+			// } else {
+			// 	bindings[0].buffer = get_zero_buffer(frame.state, sizeof(model_instance_data));
+			// 	bindings[0].size = sizeof(model_instance_data);
+			// }
+
+			for(size_t i = 0; i < mesh_count; ++i) {
+				// Select which render pipeline to use
+				auto& mat = get_material_for_mesh(i);
+				draw.render_pass.setPipeline(mat.pipeline);
+
+				auto& mesh = meshes()[i];
+				auto metadata = mesh.metadata();
+				size_t attribute_size = metadata.vertex_count * sizeof(vec4f);
+				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), attribute_size).data;
+
+				// Position
+				draw.render_pass.setVertexBuffer(0, mesh.vertex_buffer, metadata.position_start, attribute_size);
+				// Normals
+				draw.render_pass.setVertexBuffer(1, mesh.normals ? mesh.vertex_buffer : zeroBuffer, metadata.normals_start, attribute_size);
+				// Tangents
+				draw.render_pass.setVertexBuffer(2, mesh.tangents ? mesh.vertex_buffer : zeroBuffer, metadata.tangents_start, attribute_size);
+				// UVs
+				draw.render_pass.setVertexBuffer(3, mesh.uvs ? mesh.vertex_buffer : zeroBuffer, metadata.uvs_start, attribute_size);
+				// CTA
+				draw.render_pass.setVertexBuffer(4, mesh.cta ? mesh.vertex_buffer : zeroBuffer, metadata.cta_start, attribute_size);
+				// Colors
+				draw.render_pass.setVertexBuffer(5, mesh.colors ? mesh.vertex_buffer : zeroBuffer, metadata.colors_start, attribute_size);
+				// Bones
+				draw.render_pass.setVertexBuffer(6, mesh.bones ? mesh.vertex_buffer : zeroBuffer, metadata.bones_start, attribute_size);
+				// Bone Weights
+				draw.render_pass.setVertexBuffer(7, mesh.bone_weights ? mesh.vertex_buffer : zeroBuffer, metadata.bone_weights_start, attribute_size);
+
+				if(mesh.index_buffer) {
+					draw.render_pass.setIndexBuffer(mesh.index_buffer, wgpu::IndexFormat::Uint32, 0, metadata.triangle_count * 3 * sizeof(index_t));
+					draw.render_pass.drawIndexed(metadata.triangle_count * 3, std::max<size_t>(instances.size(), 1), 0, 0, 0);
+				} else
+					draw.render_pass.draw(metadata.vertex_count, std::max<size_t>(instances.size(), 1), 0, 0);
+			}
+			return result<void>::success;
+		} WAYLIB_CATCH
 	};
 
 
