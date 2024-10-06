@@ -138,6 +138,7 @@ typedef struct {
 
 struct WAYLIB_PREFIXED(window);
 struct WAYLIB_PREFIXED(shader_preprocessor);
+struct WAYLIB_PREFIXED(finalizer_list);
 
 
 //////////////////////////////////////////////////////////////////////
@@ -193,6 +194,7 @@ typedef struct {
 	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) gbuffer;
 	WAYLIB_C_OR_CPP_TYPE(WGPUCommandEncoder, wgpu::CommandEncoder) pre_encoder, render_encoder;
 	WAYLIB_C_OR_CPP_TYPE(WGPURenderPassEncoder, wgpu::RenderPassEncoder) render_pass;
+	WAYLIB_PREFIXED(finalizer_list)* finalizers;
 } WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC);
 
 // Shader

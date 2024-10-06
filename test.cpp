@@ -5,7 +5,7 @@
 int main() {
 	wl::auto_release window = wl::window::create({800, 600});
 	wl::auto_release state = window.create_default_state().throw_if_error();
-	window.reconfigure_surface_on_resize(state);
+	window.reconfigure_surface_on_resize(state).throw_if_error();
 
 	// GBuffer that gets its color format from the window
 	auto gbuffer = wl::Gbuffer::create_default(state, window.get_size(), {
@@ -62,12 +62,11 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	model.material_count = 1;
 	model.c().materials = &material;
 	model.c().mesh_materials = nullptr;
-	
 
 
 	// WAYLIB_MAIN_LOOP(!window.should_close(),
 	while(!window.should_close()) {
-		auto draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}).throw_if_error();
+		wl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}).throw_if_error();
 		{
 			model.draw_instanced(draw, {});
 		}
@@ -75,7 +74,7 @@ fn fragment(vert: vertex_output) -> fragment_output {
 
 		// Blit texture
 		auto surface = state.current_surface_texture().throw_if_error();
-		gbuffer.color().blit_to(state, surface).throw_if_error();
+		wl::auto_release blit = gbuffer.color().blit_to(state, surface).throw_if_error();
 		state.surface.present();
 	}
 	// );

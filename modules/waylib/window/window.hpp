@@ -40,16 +40,17 @@ WAYLIB_BEGIN_NAMESPACE
 			return partial;
 		} WAYLIB_CATCH
 
-		inline result<void> configure_surface(wgpu_state& state, surface_configuration config = {}) const {
-			return state.configure_surface(get_dimensions(), config);
+		inline result<window*> configure_surface(wgpu_state& state, surface_configuration config = {}) const {
+			if(auto res = state.configure_surface(get_dimensions(), config); !res) return unexpected(res.error());
+			return const_cast<window*>(this);
 		}
 
-		result<void> reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
+		result<window*> reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
 			raw.sizeEvent.append([&state, config](glfw::Window&, int x, int y){
 				state.configure_surface({x, y}, config);
 			});
 			if(config.automatic_should_configure_now) return configure_surface(state, config);
-			return result<void>::success;
+			return this;
 		}
 
 		template<GbufferTargetProvider Tgbuffer>

@@ -116,11 +116,10 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 			}
 		}
 #endif // __EMSCRIPTEN__
-
 	});
 	if(!device) return unexpected("Failed to create device.");
 
-	return wgpu_stateC{instance, adapter, device, surface};
+	return wgpu_stateC{instance, adapter, device, surface, wgpu::TextureFormat::Undefined};
 } WAYLIB_CATCH
 
 result<texture> wgpu_state::current_surface_texture() {
@@ -132,7 +131,7 @@ result<texture> wgpu_state::current_surface_texture() {
 	}
 
 	texture out = textureC{.gpu_texture = texture_.texture};
-	out.maybe_create_view();
+	out.create_view();
 	return out;
 }
 
@@ -238,7 +237,7 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 	if(!depthTexture.gpu_texture || depthTexture.size() != size()) {
 		if(depthTexture.gpu_texture) depthTexture.gpu_texture.release();
 		depthTexture.gpu_texture = state.device.createTexture(depthTextureDesc);
-		depthTexture.maybe_create_view(wgpu::TextureAspect::DepthOnly);
+		depthTexture.create_view(wgpu::TextureAspect::DepthOnly);
 	}
 
 
@@ -280,6 +279,8 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	// Create the render pass
 	out.render_pass = out.render_encoder.beginRenderPass(renderPassDesc);
+	static finalizer_list finalizers = {};
+	out.finalizers = &finalizers;
 	// setup_default_bindings(out);
 	return {{std::move(out)}};
 } WAYLIB_CATCH
@@ -315,10 +316,10 @@ result<texture*> texture::blit(drawing_state& draw, shader& blit_shader, bool di
 	draw.render_pass.setPipeline(blitMaterial->pipeline);
 	draw.render_pass.setBindGroup(0, bindGroup, 0, nullptr);
 	draw.render_pass.draw(3, 1, 0, 0);
-	return result<void>::success;
+	return this;
 }
 
-result<void> texture::blit(drawing_state& draw) {
+result<texture*> texture::blit(drawing_state& draw) {
 	static auto_release<shader> blitShader = {};
 	if(!blitShader) {
 		auto tmp = shader::from_wgsl(draw.state(), R"_(
@@ -357,18 +358,20 @@ fn fragment(vert: vertex_output) -> @location(0) vec4f {
 	return blit(draw, blitShader, false);
 }
 
-result<void> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
+result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
 	if(!draw) return unexpected(draw.error());
 	blit(*draw);
-	return draw->draw();
+	if(auto res = draw->draw(); !res) return unexpected(res.error());
+	return draw;
 }
 
-result<void> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
+result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
 	if(!draw) return unexpected(draw.error());
 	blit(*draw, blit_shader);
-	return draw->draw();
+	if(auto res = draw->draw(); !res) return unexpected(res.error());
+	return draw;
 }
 
 
@@ -435,6 +438,8 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	// Create the render pass
 	out.render_pass = out.render_encoder.beginRenderPass(renderPassDesc);
+	static finalizer_list finalizers = {};
+	out.finalizers = &finalizers;
 	// setup_default_bindings(out);
 	return {{std::move(out)}};
 } WAYLIB_CATCH
