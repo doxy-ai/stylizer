@@ -68,14 +68,12 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	while(!window.should_close()) {
 		wl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}).throw_if_error();
 		{
-			model.draw_instanced(draw, {});
+			model.draw_instanced(draw, {}).throw_if_error();
 		}
 		draw.draw().throw_if_error();
 
-		// Blit texture
-		auto surface = state.current_surface_texture().throw_if_error();
-		wl::auto_release blit = gbuffer.color().blit_to(state, surface).throw_if_error();
-		state.surface.present();
+		// Present gbuffer's color
+		window.present(state, gbuffer.color()).throw_if_error();
 	}
 	// );
 }

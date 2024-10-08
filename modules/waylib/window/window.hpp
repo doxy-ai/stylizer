@@ -2,7 +2,6 @@
 
 #include "glfwpp/event.h"
 #include "waylib/core/core.hpp"
-#include "waylib/core/utility.hpp"
 
 #include <glfwpp/glfwpp.h>
 #include <glfw3webgpu.h>
@@ -15,6 +14,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 	struct window {
 		glfw::Window raw;
+		wgpu::Surface surface = nullptr;
 
 		static struct window create(vec2u size, std::string_view name = "Waylib", window_config config = {});
 
@@ -29,11 +29,12 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 		inline vec2u get_size() const { return get_dimensions(); }
 
-		wgpu::Surface get_surface(WGPUInstance instance) const {
-			return glfwCreateWindowWGPUSurface(instance, raw);
+		wgpu::Surface get_surface(WGPUInstance instance) {
+			if(!surface) surface = glfwCreateWindowWGPUSurface(instance, raw);
+			return surface;
 		}
 
-		result<wgpu_state> create_default_state(bool prefer_low_power = false) const WAYLIB_TRY {
+		result<wgpu_state> create_default_state(bool prefer_low_power = false) WAYLIB_TRY {
 			auto partial = wgpu_state::create_default(nullptr, prefer_low_power);
 			if(!partial) return partial;
 			partial->surface = get_surface(partial->instance);
@@ -59,6 +60,22 @@ WAYLIB_BEGIN_NAMESPACE
 				gbuffer.resize(state, {x, y});
 			});
 			return *this;
+		}
+
+		wl::result<wl::window*> present(wgpu_state& state, wl::releasable auto... releases) WAYLIB_TRY {
+		#ifndef __EMSCRIPTEN__
+			surface.present();
+		#endif
+			(releases.release(), ...);
+			return this;
+		} WAYLIB_CATCH
+
+		wl::result<wl::window*> present(wgpu_state& state, wl::texture& texture, wl::releasable auto... releases) {
+			auto oldSurface = state.surface; state.surface = this->surface;
+			auto surfaceTexture = state.current_surface_texture(); if(!surfaceTexture) return wl::unexpected(surfaceTexture.error());
+			auto blit = texture.blit_to(state, *surfaceTexture); if(!blit) return wl::unexpected(blit.error());
+			state.surface = oldSurface;
+			return present(state, releases..., *blit, *surfaceTexture);
 		}
 
 	};

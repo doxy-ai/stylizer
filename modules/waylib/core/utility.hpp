@@ -11,6 +11,11 @@
 WAYLIB_BEGIN_NAMESPACE
 
 	template<typename T>
+	concept releasable = requires(T t) {
+		{t.release()};
+	};
+
+	template<typename T>
 	struct auto_release: public T {
 		auto_release() : T() {}
 		auto_release(T&& raw) : T(std::move(raw)) {}
@@ -122,7 +127,7 @@ WAYLIB_BEGIN_NAMESPACE
 	}
 
 	#define WAYLIB_TRY try
-	#define WAYLIB_CATCH catch(const std::exception& e) { return unexpected(e.what()); }
+	#define WAYLIB_CATCH catch(const std::exception& e) { return WAYLIB_NAMESPACE::unexpected(e.what()); }
 #else
 	template<typename T>
 	inline T throw_if_error(const WAYLIB_OPTIONAL(T)& opt) {
@@ -171,6 +176,11 @@ WAYLIB_BEGIN_NAMESPACE
 	std::future<T> value2future(T&& value) {
 		static std::promise<T> promise;
 		promise.set_value(std::move(value));
+		return promise.get_future();
+	}
+	inline std::future<void> value2future() {
+		static std::promise<void> promise;
+		promise.set_value();
 		return promise.get_future();
 	}
 
