@@ -2,7 +2,6 @@
 
 #include "config.hpp"
 #include <webgpu/webgpu.hpp>
-#include <glm/ext/matrix_transform.hpp> // TODO: Factor into .cpp
 
 #include "utility.hpp"
 #include "waylib/core/optional.h"
@@ -11,16 +10,26 @@
 
 #include <span>
 #include <cstdint>
+#include <chrono>
 #include <sstream>
 #include <filesystem>
 #include <cstring>
 #include <utility>
 #include <concepts>
 
+#include <glm/ext/matrix_transform.hpp> // TODO: Factor into .cpp
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_projection.hpp>
+#include <glm/trigonometric.hpp>
+
 
 WAYLIB_BEGIN_NAMESPACE
 
 	#include "interfaces.h"
+
+
+	static constexpr size_t minimum_utility_buffer_size = 304;
+
 
 //////////////////////////////////////////////////////////////////////
 // # thread_pool
@@ -119,7 +128,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 		result<struct texture> current_surface_texture();
 
-		result<struct drawing_state> begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color = {});
+		result<struct drawing_state> begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(struct gpu_buffer&) utility_buffer = {});
 	};
 
 
@@ -132,17 +141,17 @@ WAYLIB_BEGIN_NAMESPACE
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(texture)
 		texture(texture&& other) { *this = std::move(other); }
 		texture& operator=(texture&& other) {
-			gpu_texture = std::exchange(other.gpu_texture, nullptr);
+			gpu_data = std::exchange(other.gpu_data, nullptr);
 			view = std::exchange(other.view, nullptr);
 			sampler = std::exchange(other.sampler, nullptr);
 			return *this;
 		}
-		operator bool() const { return gpu_texture; }
-		wgpu::TextureFormat format() { return gpu_texture.getFormat(); }
-		vec2u size() { return {gpu_texture.getWidth(), gpu_texture.getHeight()}; }
+		operator bool() const { return gpu_data; }
+		wgpu::TextureFormat format() { return gpu_data.getFormat(); }
+		vec2u size() { return {gpu_data.getWidth(), gpu_data.getHeight()}; }
 
 		void release() {
-			if(gpu_texture) std::exchange(gpu_texture, nullptr).release();
+			if(gpu_data) std::exchange(gpu_data, nullptr).release();
 			if(view) std::exchange(view, nullptr).release();
 			if(sampler) std::exchange(sampler, nullptr).release();
 		}
@@ -167,7 +176,7 @@ WAYLIB_BEGIN_NAMESPACE
 				.writeMask = wgpu::ColorWriteMask::All,
 			};
 		}
-		WGPUColorTargetState default_color_target_state() { return default_color_target_state(gpu_texture.getFormat()); }
+		WGPUColorTargetState default_color_target_state() { return default_color_target_state(gpu_data.getFormat()); }
 
 		static wgpu::Sampler default_sampler(wgpu_state& state) {
 			static auto_release sampler = state.device.createSampler(WGPUSamplerDescriptor {
@@ -203,7 +212,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 		result<texture*> create_view(wgpu::TextureAspect aspect = wgpu::TextureAspect::All) WAYLIB_TRY {
 			if(view) view.release();
-			view = gpu_texture.createView(WGPUTextureViewDescriptor{
+			view = gpu_data.createView(WGPUTextureViewDescriptor{
 				.format = format(),
 				.dimension = wgpu::TextureViewDimension::_2D,
 				.baseMipLevel = 0,
@@ -215,13 +224,13 @@ WAYLIB_BEGIN_NAMESPACE
 			return this;
 		} WAYLIB_CATCH
 
-		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {});
+		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
 
 		result<texture*> blit(struct drawing_state& draw);
 		result<texture*> blit(struct drawing_state& draw, struct shader& blit_shader, bool dirty = false);
 
-		result<drawing_state> blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {});
-		result<drawing_state> blit_to(wgpu_state& state, struct shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {});
+		result<drawing_state> blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
+		result<drawing_state> blit_to(wgpu_state& state, struct shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
 	};
 
 
@@ -237,22 +246,22 @@ WAYLIB_BEGIN_NAMESPACE
 			size = std::exchange(other.size, 0);
 			offset = std::exchange(other.offset, 0);
 			cpu_data = std::exchange(other.cpu_data, nullptr);
-			data = std::exchange(other.data, nullptr);
+			gpu_data = std::exchange(other.gpu_data, nullptr);
 			label = std::exchange(other.label, nullptr);
 			return *this;
 		}
-		operator bool() const { return data; }
+		operator bool() const { return gpu_data; }
 
 		result<gpu_buffer*> upload(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, bool mapped_at_creation = false) WAYLIB_TRY {
-			if(data == nullptr) {
-				data = state.device.createBuffer(WGPUBufferDescriptor {
+			if(gpu_data == nullptr) {
+				gpu_data = state.device.createBuffer(WGPUBufferDescriptor {
 					.label = label ? *label : "Generic Waylib Buffer",
 					.usage = usage,
 					.size = offset + size,
 					.mappedAtCreation = mapped_at_creation,
 				});
-				if(*cpu_data) state.device.getQueue().writeBuffer(data, offset, *cpu_data, size);
-			} else if(*cpu_data) state.device.getQueue().writeBuffer(data, offset, *cpu_data, size);
+				if(*cpu_data) state.device.getQueue().writeBuffer(gpu_data, offset, *cpu_data, size);
+			} else if(*cpu_data) state.device.getQueue().writeBuffer(gpu_data, offset, *cpu_data, size);
 
 			if(free_cpu_data && cpu_data) delete[] *cpu_data;
 			return this;
@@ -268,7 +277,7 @@ WAYLIB_BEGIN_NAMESPACE
 				.size = data.size(),
 				.offset = 0,
 				.cpu_data = (uint8_t*)data.data(),
-				.data = nullptr,
+				.gpu_data = nullptr,
 				.label = label.has_value ? cstring_from_view(label.value) : nullptr
 			};
 			auto out = *(gpu_buffer*)&out_;
@@ -283,9 +292,9 @@ WAYLIB_BEGIN_NAMESPACE
 
 		void release() {
 			if(cpu_data) (delete[] *cpu_data, cpu_data = nullptr);
-			if(data) {
-				data.destroy();
-				std::exchange(data, nullptr).release();
+			if(gpu_data) {
+				gpu_data.destroy();
+				std::exchange(gpu_data, nullptr).release();
 			}
 			if(label) (delete[] *label, label = nullptr);
 		}
@@ -302,6 +311,13 @@ WAYLIB_BEGIN_NAMESPACE
 			return zeroBuffer;
 		}
 
+		template<typename T = std::byte>
+		result<gpu_buffer*> write(wgpu_state& state, std::span<T> data, size_t offset = 0) WAYLIB_TRY {
+			assert(data.size() * sizeof(T) + offset < this->offset + size);
+			state.device.getQueue().writeBuffer(gpu_data, this->offset + offset, data.data(), data.size() * sizeof(T));
+			return this;
+		} WAYLIB_CATCH
+
 	protected:
 		void map_impl(wgpu_state& state, WGPUMapMode mode) const {
 			if(mode != wgpu::MapMode::None) {
@@ -311,7 +327,7 @@ WAYLIB_BEGIN_NAMESPACE
 					done = true;
 				}, WGPUBufferMapAsyncStatus{}, (void*)nullptr), nullptr);
 #else
-				auto future = const_cast<wgpu::Buffer*>(&data)->mapAsync2(mode, offset, size, WGPUBufferMapCallbackInfo2{
+				auto future = const_cast<wgpu::Buffer*>(&gpu_data)->mapAsync2(mode, offset, size, WGPUBufferMapCallbackInfo2{
 					.mode = wgpu::CallbackMode::AllowSpontaneous,
 					.callback = closure2function_pointer([&done](wgpu::MapAsyncStatus status, char const * message, void* userdata1, void* userdata2) {
 						done = true;
@@ -325,11 +341,11 @@ WAYLIB_BEGIN_NAMESPACE
 	public:
 		void* map_writable(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) {
 			map_impl(state, mode);
-			return data.getMappedRange(offset, size);
+			return gpu_data.getMappedRange(offset, size);
 		}
 		const void* map(wgpu_state& state, WGPUMapMode mode = wgpu::MapMode::None) const {
 			map_impl(state, mode);
-			return const_cast<wgpu::Buffer*>(&data)->getConstMappedRange(offset, size);
+			return const_cast<wgpu::Buffer*>(&gpu_data)->getConstMappedRange(offset, size);
 		}
 
 
@@ -368,10 +384,10 @@ WAYLIB_BEGIN_NAMESPACE
 			return {(T*)*cpu_data, size / sizeof(T)};
 		}
 
-		void unmap() { data.unmap(); }
+		void unmap() { gpu_data.unmap(); }
 
 		void copy_record_existing(WGPUCommandEncoder encoder, const gpu_buffer& source) {
-			static_cast<wgpu::CommandEncoder>(encoder).copyBufferToBuffer(source.data, source.offset, data, offset, size);
+			static_cast<wgpu::CommandEncoder>(encoder).copyBufferToBuffer(source.gpu_data, source.offset, gpu_data, offset, size);
 		}
 
 		result<gpu_buffer*> copy(wgpu_state& state, const gpu_buffer& source) WAYLIB_TRY {
@@ -428,7 +444,7 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
-	struct Gbuffer : public GbufferC {
+	struct Gbuffer: public GbufferC {
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(Gbuffer)
 		Gbuffer(Gbuffer&& other) { *this = std::move(other); }
 		Gbuffer& operator=(Gbuffer&& other) {
@@ -446,7 +462,7 @@ WAYLIB_BEGIN_NAMESPACE
 			Gbuffer out = {};
 			if(config.color_format == wgpu::TextureFormat::Undefined && state.surface_format != wgpu::TextureFormat::Undefined)
 				config.color_format = state.surface_format;
-			out.color().gpu_texture = state.device.createTexture(WGPUTextureDescriptor {
+			out.color().gpu_data = state.device.createTexture(WGPUTextureDescriptor {
 				.label = "Waylib Color Buffer",
 				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
 				.dimension = wgpu::TextureDimension::_2D,
@@ -458,7 +474,7 @@ WAYLIB_BEGIN_NAMESPACE
 				.viewFormats = &config.color_format
 			});
 			out.color().create_view();
-			out.depth().gpu_texture = state.device.createTexture(WGPUTextureDescriptor {
+			out.depth().gpu_data = state.device.createTexture(WGPUTextureDescriptor {
 				.label = "Waylib Depth Buffer",
 				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
 				.dimension = wgpu::TextureDimension::_2D,
@@ -470,7 +486,7 @@ WAYLIB_BEGIN_NAMESPACE
 				.viewFormats = &config.depth_format
 			});
 			out.depth().create_view(wgpu::TextureAspect::DepthOnly);
-			out.normal().gpu_texture = state.device.createTexture(WGPUTextureDescriptor {
+			out.normal().gpu_data = state.device.createTexture(WGPUTextureDescriptor {
 				.label = "Waylib Normal Buffer",
 				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
 				.dimension = wgpu::TextureDimension::_2D,
@@ -486,9 +502,9 @@ WAYLIB_BEGIN_NAMESPACE
 		} WAYLIB_CATCH
 
 		void release() {
-			if(color().gpu_texture) color().release();
-			if(depth().gpu_texture) depth().release();
-			if(normal().gpu_texture) normal().release();
+			if(color().gpu_data) color().release();
+			if(depth().gpu_data) depth().release();
+			if(normal().gpu_data) normal().release();
 		}
 
 		std::array<WGPUColorTargetState, 2> targets() {
@@ -498,11 +514,13 @@ WAYLIB_BEGIN_NAMESPACE
 			};
 		}
 
+		wl::result<wgpu::BindGroup> bind_group(struct drawing_state& draw, struct material& mat);
+
 		result<Gbuffer*> resize(wgpu_state& state, vec2u size) {
 			auto _new = create_default(state, size, {
-				.color_format = color().gpu_texture.getFormat(),
-				.depth_format = depth().gpu_texture.getFormat(),
-				.normal_format = normal().gpu_texture.getFormat(),
+				.color_format = color().gpu_data.getFormat(),
+				.depth_format = depth().gpu_data.getFormat(),
+				.normal_format = normal().gpu_data.getFormat(),
 			});
 			if(!_new) return unexpected(_new.error());
 
@@ -511,7 +529,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return this;
 		}
 
-		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {});
+		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
 	};
 
 	template<typename Tgbuffer>
@@ -608,6 +626,8 @@ WAYLIB_BEGIN_NAMESPACE
 		inline shader_preprocessor& initialize_platform_defines(const wgpu_state& state) {
 			return initialize_platform_defines(state.adapter);
 		}
+
+		shader_preprocessor& initialize_virtual_filesystem(const config &config = {});
 
 		// Wrappers to ensure that the proper type is returned... for chaining purposes
 		inline shader_preprocessor& add_define(std::string_view name, std::string_view value) {
@@ -746,7 +766,7 @@ WAYLIB_BEGIN_NAMESPACE
 				bufferEntries = std::vector<wgpu::BindGroupEntry>(buffer_count, wgpu::Default); // TODO: Why does std::vector except?
 				for(size_t i = 0; i < buffer_count; ++i) {
 					bufferEntries[i].binding = i;
-					bufferEntries[i].buffer = buffers()[i].data;
+					bufferEntries[i].buffer = buffers()[i].gpu_data;
 					bufferEntries[i].offset = buffers()[i].offset;
 					bufferEntries[i].size = buffers()[i].size;
 				}
@@ -839,6 +859,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 		std::span<shader> shaders_span() { return {static_cast<shader*>(shaders.value), shader_count}; }
+		operator bool() { return pipeline; }
 
 		// TODO: This function needs to become gbuffer aware
 		result<material*> upload(
@@ -1060,10 +1081,10 @@ WAYLIB_BEGIN_NAMESPACE
 				.vertex_count = vertex_count,
 				.triangle_count = triangle_count,
 
-				.position_start = 0,
+				.position_start = sizeof(mesh_metadata), // Not accounting for metadata size... on gpu this is correct, on cpu need to add sizeof(mesh_metadata)
 				// Others should default to zero :)
 			};
-			size_t offset = vertex_count * sizeof(vec4f); // Account for position
+			size_t offset = vertex_count * sizeof(vec4f) + sizeof(mesh_metadata); // Account for position and metadata
 			if(*normals) (meta.normals_start = offset, offset += vertex_count * sizeof(vec4f));
 			if(*tangents) (meta.tangents_start = offset, offset += vertex_count * sizeof(vec4f));
 			if(*uvs) (meta.uvs_start = offset, offset += vertex_count * sizeof(vec4f));
@@ -1075,20 +1096,33 @@ WAYLIB_BEGIN_NAMESPACE
 			return meta;
 		}
 
-		result<mesh*> upload(wgpu_state& state) WAYLIB_TRY {
-			// if(mesh.uvs && !mesh.tangents) mesh_generate_tangents(mesh);
+		mesh_metadata gpu_metadata() {
+			auto meta = metadata();
+			meta.position_start -= sizeof(mesh_metadata);
+			if(meta.normals_start > 0) meta.normals_start -= sizeof(mesh_metadata);
+			if(meta.tangents_start > 0) meta.tangents_start -= sizeof(mesh_metadata);
+			if(meta.uvs_start > 0) meta.uvs_start -= sizeof(mesh_metadata);
+			if(meta.cta_start > 0) meta.cta_start -= sizeof(mesh_metadata);
+			if(meta.colors_start > 0) meta.colors_start -= sizeof(mesh_metadata);
+			if(meta.bones_start > 0) meta.bones_start -= sizeof(mesh_metadata);
+			if(meta.bone_weights_start > 0) meta.bone_weights_start -= sizeof(mesh_metadata);
+			return meta;
+		}
 
+		result<mesh*> upload(wgpu_state& state) WAYLIB_TRY {
 			if(vertex_buffer) vertex_buffer.release();
 			auto metadata = this->metadata();
+			auto gpuMetadata = this->gpu_metadata();
 			size_t attribute_size = metadata.vertex_count * sizeof(vec4f);
 
 			gpu_buffer buffer = gpu_bufferC{
 				.size = metadata.vertex_buffer_size
 			};
-			buffer.upload(state, wgpu::BufferUsage::Vertex, false, true);
+			buffer.upload(state, wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage, false, true);
 			std::byte* mapped = (std::byte*)buffer.map_writable(state);
 
 			// Upload geometry data to the buffer
+			memcpy(mapped, &gpuMetadata, sizeof(metadata));
 			memcpy(mapped + metadata.position_start, *positions, attribute_size);
 			if(*normals) memcpy(mapped + metadata.normals_start, *normals, attribute_size);
 			if(*tangents) memcpy(mapped + metadata.tangents_start, *tangents, attribute_size);
@@ -1106,9 +1140,9 @@ WAYLIB_BEGIN_NAMESPACE
 			if(!indexBuffer) return wl::unexpected(indexBuffer.error());
 
 			if(vertex_buffer) vertex_buffer.release();
-			vertex_buffer = buffer.data;
+			vertex_buffer = buffer.gpu_data;
 			if(index_buffer) index_buffer.release();
-			index_buffer = indexBuffer->data;
+			index_buffer = indexBuffer->gpu_data;
 			return this;
 		} WAYLIB_CATCH
 	};
@@ -1131,6 +1165,7 @@ WAYLIB_BEGIN_NAMESPACE
 			c().mesh_materials = std::exchange(other.c().mesh_materials, nullptr);
 			return *this;
 		}
+		operator bool() { return *c().meshes && *c().materials; }
 		std::span<mesh> meshes() { return {static_cast<mesh*>(*c().meshes), mesh_count}; }
 		std::span<material> materials() { return {static_cast<material*>(*c().materials), material_count}; }
 		std::span<index_t> mesh_materials() { return {static_cast<index_t*>(*c().mesh_materials), mesh_count}; }
@@ -1155,21 +1190,46 @@ WAYLIB_BEGIN_NAMESPACE
 		template<GbufferTargetProvider Tgbuffer>
 		result<model*> upload(wgpu_state& state, Tgbuffer& gbuffer) { return upload(state, gbuffer.targets()); }
 
-		result<model*> draw_instanced(drawing_state& draw, std::span<model_instance_data> instances) WAYLIB_TRY {
-			// if(instances.size() > 0) {
-			// 	instanceBufferDesc.size = sizeof(model_instance_data) * instances.size();
-			// 	wgpu::Buffer instanceBuffer = frame.state.device.createBuffer(instanceBufferDesc); frame_defer(frame) { instanceBuffer.destroy(); instanceBuffer.release(); };
-			// 	// memcpy(instanceBuffer.getMappedRange(0, instanceBufferDesc.size), instances.data(), instanceBufferDesc.size);
-			// 	// instanceBuffer.unmap();
-			// 	frame.state.device.getQueue().writeBuffer(instanceBuffer, 0, instances.data(), sizeof(model_instance_data) * instances.size());
-			// 	frame_defer(frame) { instanceBuffer.destroy(); instanceBuffer.release(); };
+		void release() {
+			// TODO: Implement
+		}
 
-			// 	bindings[0].buffer = instanceBuffer;
-			// 	bindings[0].size = sizeof(model_instance_data) * instances.size();
-			// } else {
-			// 	bindings[0].buffer = get_zero_buffer(frame.state, sizeof(model_instance_data));
-			// 	bindings[0].size = sizeof(model_instance_data);
-			// }
+		result<model*> draw_instanced(drawing_state& draw, std::span<model_instance> instances) WAYLIB_TRY {
+			std::array<WGPUBindGroupEntry, 3> bindings = {
+				WGPUBindGroupEntry{ // Mesh (metadata + vertex attributes)
+					.binding = 0,
+					// .buffer = mesh.vertex_buffer,
+					.offset = 0,
+					// .size = metadata.vertex_buffer_size
+				}, WGPUBindGroupEntry{ // Indicies
+					.binding = 1,
+					// .buffer = metadata.is_indexed ? mesh.index_buffer : zeroBuffer->data,
+					.offset = 0,
+					// .size = index_size
+				}, WGPUBindGroupEntry{ // Instances
+					.binding = 2,
+					// .buffer = instanceBuffer,
+					.offset = 0,
+					// .size = instanceBuffer.size
+				}
+			};
+
+			gpu_buffer instanceBuffer;
+			if(instances.size() > 0) {
+				instanceBuffer = gpu_bufferC{.size = instances.size() * sizeof(model_instance)};
+				instanceBuffer.upload(draw.state());
+				instanceBuffer.write(draw.state(), instances);
+				draw.defer([instanceBuffer]{ const_cast<gpu_buffer&>(instanceBuffer).release(); });
+
+				bindings[2].buffer = instanceBuffer.gpu_data;
+				bindings[2].size = instanceBuffer.size;
+			} else {
+				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), sizeof(model_instance));
+				if(!zeroBuffer) return unexpected(zeroBuffer.error());
+
+				bindings[2].buffer = zeroBuffer->gpu_data;
+				bindings[2].size = sizeof(model_instance);
+			}
 
 			for(size_t i = 0; i < mesh_count; ++i) {
 				// Select which render pipeline to use
@@ -1179,34 +1239,247 @@ WAYLIB_BEGIN_NAMESPACE
 				auto& mesh = meshes()[i];
 				auto metadata = mesh.metadata();
 				size_t attribute_size = metadata.vertex_count * sizeof(vec4f);
-				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), attribute_size);
+				size_t index_size = metadata.triangle_count * 3 * sizeof(index_t);
+				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), std::max(attribute_size, index_size));
 				if(!zeroBuffer) return unexpected(zeroBuffer.error());
+
+				auto drawTimeBindGroup = draw.gbuffer().bind_group(draw, mat);
+				if(!drawTimeBindGroup) return unexpected(drawTimeBindGroup.error());
+				draw.render_pass.setBindGroup(0, *drawTimeBindGroup, 0, nullptr);
+				draw.defer([group = *drawTimeBindGroup]{ const_cast<wgpu::BindGroup&>(group).release(); });
+
+				bindings[0].buffer = mesh.vertex_buffer;
+				bindings[0].size = metadata.vertex_buffer_size;
+				bindings[1].buffer = metadata.is_indexed ? mesh.index_buffer : zeroBuffer->gpu_data;
+				bindings[1].size = index_size;
+
+				auto perMeshBindGroup = draw.state().device.createBindGroup(WGPUBindGroupDescriptor {
+					.label = "Waylib Mesh Data Bind Group",
+					.layout = mat.pipeline.getBindGroupLayout(1),
+					.entryCount = bindings.size(),
+					.entries = bindings.data()
+				});
+				draw.render_pass.setBindGroup(1, perMeshBindGroup, 0, nullptr);
+				draw.defer([perMeshBindGroup]{ const_cast<wgpu::BindGroup&>(perMeshBindGroup).release(); });
 
 				// Position
 				draw.render_pass.setVertexBuffer(0, mesh.vertex_buffer, metadata.position_start, attribute_size);
 				// Normals
-				draw.render_pass.setVertexBuffer(1, mesh.normals ? mesh.vertex_buffer : zeroBuffer->data, metadata.normals_start, attribute_size);
+				draw.render_pass.setVertexBuffer(1, mesh.normals ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.normals_start, attribute_size);
 				// Tangents
-				draw.render_pass.setVertexBuffer(2, mesh.tangents ? mesh.vertex_buffer : zeroBuffer->data, metadata.tangents_start, attribute_size);
+				draw.render_pass.setVertexBuffer(2, mesh.tangents ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.tangents_start, attribute_size);
 				// UVs
-				draw.render_pass.setVertexBuffer(3, mesh.uvs ? mesh.vertex_buffer : zeroBuffer->data, metadata.uvs_start, attribute_size);
+				draw.render_pass.setVertexBuffer(3, mesh.uvs ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.uvs_start, attribute_size);
 				// CTA
-				draw.render_pass.setVertexBuffer(4, mesh.cta ? mesh.vertex_buffer : zeroBuffer->data, metadata.cta_start, attribute_size);
+				draw.render_pass.setVertexBuffer(4, mesh.cta ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.cta_start, attribute_size);
 				// Colors
-				draw.render_pass.setVertexBuffer(5, mesh.colors ? mesh.vertex_buffer : zeroBuffer->data, metadata.colors_start, attribute_size);
+				draw.render_pass.setVertexBuffer(5, mesh.colors ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.colors_start, attribute_size);
 				// Bones
-				draw.render_pass.setVertexBuffer(6, mesh.bones ? mesh.vertex_buffer : zeroBuffer->data, metadata.bones_start, attribute_size);
+				draw.render_pass.setVertexBuffer(6, mesh.bones ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.bones_start, attribute_size);
 				// Bone Weights
-				draw.render_pass.setVertexBuffer(7, mesh.bone_weights ? mesh.vertex_buffer : zeroBuffer->data, metadata.bone_weights_start, attribute_size);
+				draw.render_pass.setVertexBuffer(7, mesh.bone_weights ? mesh.vertex_buffer : zeroBuffer->gpu_data, metadata.bone_weights_start, attribute_size);
 
 				if(mesh.index_buffer) {
-					draw.render_pass.setIndexBuffer(mesh.index_buffer, wgpu::IndexFormat::Uint32, 0, metadata.triangle_count * 3 * sizeof(index_t));
+					draw.render_pass.setIndexBuffer(mesh.index_buffer, wgpu::IndexFormat::Uint32, 0, index_size);
 					draw.render_pass.drawIndexed(metadata.triangle_count * 3, std::max<size_t>(instances.size(), 1), 0, 0, 0);
 				} else
 					draw.render_pass.draw(metadata.vertex_count, std::max<size_t>(instances.size(), 1), 0, 0);
 			}
 			return this;
 		} WAYLIB_CATCH
+	};
+
+
+//////////////////////////////////////////////////////////////////////
+// # Utility Data
+//////////////////////////////////////////////////////////////////////
+
+
+	struct time: public timeC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(time)
+		time(model&& other) { *this = std::move(other); }
+		time& operator=(time&& other) {
+			since_start = std::exchange(since_start, 0);
+			delta = std::exchange(delta, 0);
+			average_delta = std::exchange(average_delta, 0);
+			return *this;
+		}
+
+		inline time& calculate_only_delta() {
+			static auto last = std::chrono::steady_clock::now();
+
+			auto now = std::chrono::steady_clock::now();
+			delta = std::chrono::duration_cast<std::chrono::microseconds>(now - last).count() / 1'000'000.0;
+
+			last = now;
+			return *this;
+		}
+
+		inline time& calculate() {
+			calculate_only_delta();
+
+			since_start += delta;
+
+			constexpr static float alpha = .9;
+			if(std::abs(average_delta) < 2 * std::numeric_limits<float>::epsilon()) average_delta = delta;
+			average_delta = average_delta * alpha + delta * (1 - alpha);
+			return *this;
+		}
+
+		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer) {
+				std::vector<std::byte> zeroData(minimum_utility_buffer_size, std::byte{0});
+				auto res = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, {"Waylib Utility Data Buffer"});
+				if(!res) return res;
+				utility_buffer = *res;
+			}
+
+			utility_buffer.write<time>(state, {this, 1}, 0);
+			return utility_buffer;
+		}
+	};
+
+	struct camera3D: public camera3DC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(camera3D)
+		camera3D(camera3D&& other) { *this = std::move(other); }
+		camera3D& operator=(camera3D&& other) {
+			view_matrix = std::exchange(other.view_matrix, {});
+			projection_matrix = std::exchange(other.projection_matrix, {});
+			position = std::exchange(other.position, {});
+			target_position = std::exchange(other.target_position, {});
+			up = std::exchange(other.up, {});
+			field_of_view = std::exchange(other.field_of_view, 0);
+			near_clip_distance = std::exchange(other.near_clip_distance, 0);
+			far_clip_distance = std::exchange(other.far_clip_distance, 0);
+			orthographic = std::exchange(other.orthographic, 0);
+			return *this;
+		}
+
+		camera3D& calculate_matricies(vec2u window_size) {
+			view_matrix = glm::lookAt(position, target_position, up);
+			if(orthographic) {
+				float right = field_of_view / 2;
+				float top = right * window_size.y / window_size.x;
+				projection_matrix = glm::ortho<float>(-right, right, -top, top, near_clip_distance, far_clip_distance);
+			} else
+				projection_matrix = glm::perspectiveFov<float>(field_of_view, window_size.x, window_size.y, near_clip_distance, far_clip_distance);
+			return *this;
+		}
+
+		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer) {
+				std::vector<std::byte> zeroData(minimum_utility_buffer_size, std::byte{0});
+				auto res = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, {"Waylib Utility Data Buffer"});
+				if(!res) return res;
+				utility_buffer = *res;
+			}
+
+			utility_buffer.write<camera3D>(state, {this, 1}, 16);
+			return utility_buffer;
+		}
+	};
+
+	static_assert(sizeof(camera3DC) == sizeof(camera2DC), "The two camera classes need to have the same size in bytes");
+
+	struct camera2D: public camera2DC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(camera2D)
+		camera2D(camera2D&& other) { *this = std::move(other); }
+		camera2D& operator=(camera2D&& other) {
+			view_matrix = std::exchange(other.view_matrix, {});
+			projection_matrix = std::exchange(other.projection_matrix, {});
+			offset = std::exchange(other.offset, {});
+			target_position = std::exchange(other.target_position, {});
+			rotation = std::exchange(other.rotation, 0);
+			near_clip_distance = std::exchange(other.near_clip_distance, 0);
+			far_clip_distance = std::exchange(other.far_clip_distance, 0);
+			zoom = std::exchange(other.zoom, 0);
+			pixel_perfect = std::exchange(other.pixel_perfect, 0);
+			return *this;
+		}
+
+		camera2D& calculate_matricies(vec2u window_size) {
+			vec3f position = {target_position.x, target_position.y, -1};
+			vec4f up = {0, 1, 0, 0};
+			up = glm::rotate(glm::identity<glm::mat4x4>(), glm::radians(rotation)/* .radian_value() */, vec3f{0, 0, 1}) * up;
+			if(pixel_perfect) projection_matrix = glm::ortho<float>(0, window_size.x, window_size.y, 0, near_clip_distance, far_clip_distance);
+			else projection_matrix = glm::ortho<float>(0, 1/zoom, 1/zoom, 0, near_clip_distance, far_clip_distance);
+			view_matrix = glm::lookAt<float>(position, position + vec3f{0, 0, 1}, up.xyz());
+			return *this;
+		}
+
+		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer) {
+				std::vector<std::byte> zeroData(minimum_utility_buffer_size, std::byte{0});
+				auto res = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, {"Waylib Utility Data Buffer"});
+				if(!res) return res;
+				utility_buffer = *res;
+			}
+
+			utility_buffer.write<camera2D>(state, {this, 1}, 16);
+			return utility_buffer;
+		}
+	};
+
+	struct light: public lightC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(light)
+		light(light&& other) { *this = std::move(other); }
+		light& operator=(light&& other) {
+			light_type = std::exchange(other.light_type, {});
+			intensity = std::exchange(other.intensity, 0);
+			cutoff_start_angle = std::exchange(other.cutoff_start_angle, 0);
+			cutoff_end_angle = std::exchange(other.cutoff_end_angle, 0);
+			falloff = std::exchange(other.falloff, 0);
+			position = std::exchange(other.position, {});
+			direction = std::exchange(other.direction, {});
+			color = std::exchange(other.color, {});
+			return *this;
+		}
+
+		static wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, std::span<light> lights, gpu_buffer utility_buffer = {}, bool skip_resize_copy = false) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer || (utility_buffer.size - 208) / sizeof(light) != lights.size()) {
+				std::vector<std::byte> zeroData(208 + sizeof(light) * lights.size(), std::byte{0});
+				auto res = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, {"Waylib Utility Data Buffer"});
+				if(!res) return res;
+				if(!skip_resize_copy)
+					if(auto res2 = res->copy(state, utility_buffer); !res2) return unexpected(res2.error());
+				if(utility_buffer) utility_buffer.release();
+				utility_buffer = *res;
+			}
+
+			utility_buffer.write<light>(state, lights, 208);
+			return utility_buffer;
+		}
+		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}, bool skip_resize_copy = false) {
+			return update_utility_buffer(state, {this, 1}, utility_buffer, skip_resize_copy);
+		}
 	};
 
 

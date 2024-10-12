@@ -192,4 +192,8 @@ WAYLIB_BEGIN_NAMESPACE
 		return {};
 	}
 
+	inline float& iAsF(uint32_t& in) {
+		return *(float*)&in;
+	}
+
 WAYLIB_END_NAMESPACE

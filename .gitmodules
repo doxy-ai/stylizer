@@ -11,3 +11,6 @@
 [submodule "modules/waylib/window/thirdparty/glfw3webgpu"]
 	path = modules/waylib/window/thirdparty/glfw3webgpu
 	url = https://github.com/eliemichel/glfw3webgpu.git
+[submodule "modules/waylib/core/thirdparty/embed"]
+	path = modules/waylib/core/thirdparty/embed
+	url = https://github.com/batterycenter/embed.git

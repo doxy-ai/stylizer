@@ -3,6 +3,7 @@
 #define IS_WAYLIB_CORE_CPP
 #include "core.hpp"
 
+#include <battery/embed.hpp>
 #include <algorithm>
 #include <map>
 
@@ -130,15 +131,15 @@ result<texture> wgpu_state::current_surface_texture() {
 		return unexpected(s.str());
 	}
 
-	texture out = textureC{.gpu_texture = texture_.texture};
+	texture out = textureC{.gpu_data = texture_.texture};
 	out.create_view();
 	return out;
 }
 
-result<struct drawing_state> wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */){
+result<struct drawing_state> wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */){
 	auto texture = current_surface_texture();
 	if(!texture) return unexpected(texture.error());
-	return texture->begin_drawing(*this, clear_color);
+	return texture->begin_drawing(*this, clear_color, utility_buffer);
 }
 
 WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(default_state_from_instance)(
@@ -201,7 +202,7 @@ WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC)) WAYLI
 //////////////////////////////////////////////////////////////////////
 
 
-result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) WAYLIB_TRY {
+result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
 	static WGPUTextureViewDescriptor viewDesc = {
 		// .format = color.getFormat(),
 		.dimension = wgpu::TextureViewDimension::_2D,
@@ -233,10 +234,10 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
 
 	static texture depthTexture = {};
-	depthTextureDesc.size = {gpu_texture.getWidth(), gpu_texture.getHeight(), 1};
-	if(!depthTexture.gpu_texture || depthTexture.size() != size()) {
-		if(depthTexture.gpu_texture) depthTexture.gpu_texture.release();
-		depthTexture.gpu_texture = state.device.createTexture(depthTextureDesc);
+	depthTextureDesc.size = {gpu_data.getWidth(), gpu_data.getHeight(), 1};
+	if(!depthTexture.gpu_data || depthTexture.size() != size()) {
+		if(depthTexture.gpu_data) depthTexture.gpu_data.release();
+		depthTexture.gpu_data = state.device.createTexture(depthTextureDesc);
 		depthTexture.create_view(wgpu::TextureAspect::DepthOnly);
 	}
 
@@ -281,7 +282,8 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 	out.render_pass = out.render_encoder.beginRenderPass(renderPassDesc);
 	static finalizer_list finalizers = {};
 	out.finalizers = &finalizers;
-	// setup_default_bindings(out);
+
+	if(utility_buffer) out.utility_buffer = static_cast<gpu_bufferC*>(&utility_buffer.value);
 	return {{std::move(out)}};
 } WAYLIB_CATCH
 
@@ -289,7 +291,7 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 result<texture*> texture::blit(drawing_state& draw, shader& blit_shader, bool dirty /* = false */) {
 	static std::map<WGPUShaderModule, material> material_map = {};
 	material* blitMaterial;
-	if(material_map.contains(blit_shader.module) && !dirty) 
+	if(material_map.contains(blit_shader.module) && !dirty)
 		blitMaterial = &material_map[blit_shader.module];
 	else {
 		blitMaterial = &(material_map[blit_shader.module] = materialC{
@@ -358,16 +360,16 @@ fn fragment(vert: vertex_output) -> @location(0) vec4f {
 	return blit(draw, blitShader, false);
 }
 
-result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
-	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
+result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) {
+	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
 	if(!draw) return unexpected(draw.error());
 	blit(*draw);
 	if(auto res = draw->draw(); !res) return unexpected(res.error());
 	return draw;
 }
 
-result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) {
-	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)});
+result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) {
+	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
 	if(!draw) return unexpected(draw.error());
 	blit(*draw, blit_shader);
 	if(auto res = draw->draw(); !res) return unexpected(res.error());
@@ -380,7 +382,32 @@ result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, t
 //////////////////////////////////////////////////////////////////////
 
 
-result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */) WAYLIB_TRY {
+wl::result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
+	auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), minimum_utility_buffer_size);
+	if(!zeroBuffer) return unexpected(zeroBuffer.error());
+
+	std::array<WGPUBindGroupEntry, 1> entries = {
+		WGPUBindGroupEntry{
+			.binding = 0,
+			.buffer = zeroBuffer->gpu_data,
+			.offset = zeroBuffer->offset,
+			.size = zeroBuffer->size,
+		}
+	};
+	if(draw.utility_buffer) {
+		entries[0].buffer = draw.utility_buffer->gpu_data;
+		entries[0].offset = draw.utility_buffer->offset;
+		entries[0].size = draw.utility_buffer->size;
+	}
+	return draw.state().device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
+		.label = "Waylib Compute Texture Bind Group",
+		.layout = mat.pipeline.getBindGroupLayout(0),
+		.entryCount = entries.size(),
+		.entries = entries.data()
+	});
+}
+
+result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
 	drawing_stateC out {.state = &state, .gbuffer = this};
 	// static frame_finalizers finalizers;
 
@@ -440,7 +467,8 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 	out.render_pass = out.render_encoder.beginRenderPass(renderPassDesc);
 	static finalizer_list finalizers = {};
 	out.finalizers = &finalizers;
-	// setup_default_bindings(out);
+
+	if(utility_buffer) out.utility_buffer = static_cast<gpu_bufferC*>(&utility_buffer.value);
 	return {{std::move(out)}};
 } WAYLIB_CATCH
 
@@ -448,6 +476,17 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 //////////////////////////////////////////////////////////////////////
 // # shader
 //////////////////////////////////////////////////////////////////////
+
+
+shader_preprocessor& shader_preprocessor::initialize_virtual_filesystem(const config &config /* = {} */) {
+	process_from_memory_and_cache(b::embed<"shaders/embeded/mesh_data.wgsl">().str(), "waylib/mesh_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/utility_data.wgsl">().str(), "waylib/utility_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/vertex_data.wgsl">().str(), "waylib/vertex_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/default_gbuffer_data.wgsl">().str(), "waylib/default_gbuffer_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/default_gbuffer.wgsl">().str(), "waylib/default_gbuffer", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/default_blit.wgsl">().str(), "waylib/default_blit", config);
+	return *this;
+}
 
 
 std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> shader::configure_render_pipeline_descriptor(
