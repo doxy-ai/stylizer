@@ -117,7 +117,7 @@ WAYLIB_BEGIN_NAMESPACE
 			surface.configure(WGPUSurfaceConfiguration {
 				.device = device,
 				.format = surface_format,
-				.usage = wgpu::TextureUsage::RenderAttachment,
+				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopyDst,
 				.alphaMode = config.alpha_mode,
 				.width = size.x,
 				.height = size.y,
@@ -133,6 +133,56 @@ WAYLIB_BEGIN_NAMESPACE
 
 
 //////////////////////////////////////////////////////////////////////
+// # Image
+//////////////////////////////////////////////////////////////////////
+
+
+	struct image: public imageC {
+		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(image)
+		image(image&& other) { *this = std::move(other); }
+		image& operator=(image&& other) {
+			format = std::exchange(other.format, image_format::Invalid);
+			data = std::exchange(other.data, nullptr);
+			size = std::exchange(other.size, {});
+			frames = std::exchange(other.frames, 0);
+			return *this;
+		}
+		operator bool() const { return format != image_format::Invalid && *data; }
+
+		inline void release() {
+			if(data) delete [] *gray;
+		}
+
+		static wgpu::TextureFormat convert_format(image_format format) {
+			switch(format){
+				case image_format::RGBA: return wgpu::TextureFormat::RGBA32Float;
+				case image_format::RGBA8: return wgpu::TextureFormat::RGBA8UnormSrgb;
+				case image_format::Gray: return wgpu::TextureFormat::R32Float;
+				case image_format::Gray8: return wgpu::TextureFormat::R8Unorm;
+				default: return wgpu::TextureFormat::Undefined;
+			}
+		}
+
+		static size_t bytes_per_pixel(image_format format) {
+			switch(format){
+				case image_format::RGBA:
+					return sizeof(**rgba);
+				case image_format::RGBA8:
+					return sizeof(**rgba8);
+				case image_format::Gray:
+					return sizeof(**gray);
+				case image_format::Gray8:
+					return sizeof(**gray8);
+				default: assert(false && "An error has occured finding the number of bytes per pixel!");
+			}
+		}
+		inline size_t bytes_per_pixel() { return bytes_per_pixel(format); }
+
+		result<struct texture> upload(wgpu_state& state, texture_create_configuation config = {}, bool take_ownership_of_image = true);
+	};
+
+
+//////////////////////////////////////////////////////////////////////
 // # Texture
 //////////////////////////////////////////////////////////////////////
 
@@ -141,6 +191,8 @@ WAYLIB_BEGIN_NAMESPACE
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(texture)
 		texture(texture&& other) { *this = std::move(other); }
 		texture& operator=(texture&& other) {
+			mip_levels = std::exchange(other.mip_levels, 1);
+			cpu_data = std::exchange(other.cpu_data, nullptr);
 			gpu_data = std::exchange(other.gpu_data, nullptr);
 			view = std::exchange(other.view, nullptr);
 			sampler = std::exchange(other.sampler, nullptr);
@@ -148,9 +200,89 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 		operator bool() const { return gpu_data; }
 		wgpu::TextureFormat format() { return gpu_data.getFormat(); }
-		vec2u size() { return {gpu_data.getWidth(), gpu_data.getHeight()}; }
+		vec2u size() { return {gpu_data.getWidth(), gpu_data.getHeight()}; } // TODO: Does this need to return a vec3 for cubemap purposes?
+
+		static wgpu::Sampler create_sampler(wgpu_state& state, WGPUAddressMode address_mode, WGPUFilterMode color_filter, WGPUMipmapFilterMode mipmap_filter) {
+			return state.device.createSampler(WGPUSamplerDescriptor {
+				.addressModeU = address_mode,
+				.addressModeV = address_mode,
+				.addressModeW = address_mode,
+				.magFilter = color_filter,
+				.minFilter = color_filter,
+				.mipmapFilter = mipmap_filter,
+				.lodMinClamp = 0,
+				.lodMaxClamp = 1,
+				.compare = wgpu::CompareFunction::Undefined,
+				.maxAnisotropy = 1,
+			});
+		}
+
+		static wgpu::Sampler default_sampler(wgpu_state& state) {
+			static auto_release sampler = create_sampler(state, wgpu::AddressMode::Repeat, wgpu::FilterMode::Nearest, wgpu::MipmapFilterMode::Nearest);
+			return sampler;
+		}
+
+		static wgpu::Sampler trilinear_sampler(wgpu_state& state) {
+			static auto_release sampler = create_sampler(state, wgpu::AddressMode::Repeat, wgpu::FilterMode::Linear, wgpu::MipmapFilterMode::Linear);
+			return sampler;
+		}
+
+		static size_t bytes_per_pixel(WGPUTextureFormat format);
+		static wgpu::TextureFormat format_remove_srgb(WGPUTextureFormat format);
+		static const char* format_to_string(WGPUTextureFormat format);
+
+		result<wgpu::TextureView> create_mip_view(uint32_t base_mip = 0, uint32_t mip_count = 1, wgpu::TextureAspect aspect = wgpu::TextureAspect::All) WAYLIB_TRY {
+			assert(base_mip + mip_count <= mip_levels);
+			return gpu_data.createView(WGPUTextureViewDescriptor{
+				.format = format(),
+				.dimension = wgpu::TextureViewDimension::_2D,
+				.baseMipLevel = base_mip,
+				.mipLevelCount = mip_count,
+				.baseArrayLayer = 0,
+				.arrayLayerCount = 1,
+				.aspect = aspect
+			});
+		} WAYLIB_CATCH
+
+		result<texture*> create_view(wgpu::TextureAspect aspect = wgpu::TextureAspect::All) WAYLIB_TRY {
+			if(view) view.release();
+			auto res = create_mip_view(0, 1, aspect); if(!res) return unexpected(res.error());
+			view = *res;
+			return this;
+		} WAYLIB_CATCH
+
+		static result<texture> create(wgpu_state& state, vec3u size, texture_create_configuation config = {}) WAYLIB_TRY {
+			texture out;
+			out.mip_levels = config.mip_levels;
+			auto format = config.format ? *config.format : wgpu::TextureFormat::RGBA8UnormSrgb;
+			out.gpu_data = state.device.createTexture(WGPUTextureDescriptor {
+				.label = "Waylib Color Buffer",
+				.usage = config.usage,
+				.dimension = config.dimension,
+				.size = {size.x, size.y, size.z},
+				.format = format,
+				.mipLevelCount = config.mip_levels,
+				.sampleCount = 1,
+				.viewFormatCount = 1,
+				.viewFormats = &format
+			});
+
+			if(config.with_view) out.create_view();
+			switch(config.sampler_type) {
+			break; case texture_create_sampler_type::None:
+			break; case texture_create_sampler_type::Nearest:
+				out.sampler = default_sampler(state);
+			break; case texture_create_sampler_type::Trilinear:
+				out.sampler = trilinear_sampler(state);
+			}
+			return out;
+		} WAYLIB_CATCH
+		static result<texture> create(wgpu_state& state, vec2u size, texture_create_configuation config = {}) {
+			return create(state, vec3u(size, 1), config);
+		}
 
 		void release() {
+			if(cpu_data) static_cast<image&>(**std::exchange(cpu_data, nullptr)).release();
 			if(gpu_data) std::exchange(gpu_data, nullptr).release();
 			if(view) std::exchange(view, nullptr).release();
 			if(sampler) std::exchange(sampler, nullptr).release();
@@ -178,59 +310,47 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 		WGPUColorTargetState default_color_target_state() { return default_color_target_state(gpu_data.getFormat()); }
 
-		static wgpu::Sampler default_sampler(wgpu_state& state) {
-			static auto_release sampler = state.device.createSampler(WGPUSamplerDescriptor {
-				.addressModeU = wgpu::AddressMode::Repeat,
-				.addressModeV = wgpu::AddressMode::Repeat,
-				.addressModeW = wgpu::AddressMode::Repeat,
-				.magFilter = wgpu::FilterMode::Nearest,
-				.minFilter = wgpu::FilterMode::Nearest,
-				.mipmapFilter = wgpu::MipmapFilterMode::Nearest,
-				.lodMinClamp = 0,
-				.lodMaxClamp = 1,
-				.compare = wgpu::CompareFunction::Undefined,
-				.maxAnisotropy = 1,
-			});
-			return sampler;
-		}
-
-		static wgpu::Sampler trilinear_sampler(wgpu_state& state) {
-			static auto_release sampler = state.device.createSampler(WGPUSamplerDescriptor {
-				.addressModeU = wgpu::AddressMode::Repeat,
-				.addressModeV = wgpu::AddressMode::Repeat,
-				.addressModeW = wgpu::AddressMode::Repeat,
-				.magFilter = wgpu::FilterMode::Linear,
-				.minFilter = wgpu::FilterMode::Linear,
-				.mipmapFilter = wgpu::MipmapFilterMode::Linear,
-				.lodMinClamp = 0,
-				.lodMaxClamp = 1,
-				.compare = wgpu::CompareFunction::Undefined,
-				.maxAnisotropy = 1,
-			});
-			return sampler;
-		}
-
-		result<texture*> create_view(wgpu::TextureAspect aspect = wgpu::TextureAspect::All) WAYLIB_TRY {
-			if(view) view.release();
-			view = gpu_data.createView(WGPUTextureViewDescriptor{
-				.format = format(),
-				.dimension = wgpu::TextureViewDimension::_2D,
-				.baseMipLevel = 0,
-				.mipLevelCount = 1,
-				.baseArrayLayer = 0,
-				.arrayLayerCount = 1,
-				.aspect = aspect
-			});
+		result<texture*> copy_to_buffer_record_existing(WGPUCommandEncoder encoder, gpu_buffer& buffer, size_t mip_level = 0);
+		result<texture*> copy_to_buffer(wgpu_state& state, gpu_buffer& buffer, size_t mip_level = 0) WAYLIB_TRY {
+			auto_release encoder = state.device.createCommandEncoder(wgpu::Default);
+			if(auto res = copy_to_buffer_record_existing(encoder, buffer, mip_level); !res) return res;
+			auto_release commands = encoder.finish(wgpu::Default);
+			state.device.getQueue().submit(commands);
 			return this;
 		} WAYLIB_CATCH
 
-		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
+		result<image> download(wgpu_state& state, image_format format = image_format::RGBA8, size_t mip_level = 0);
+
+		result<texture*> copy_record_existing(WGPUCommandEncoder encoder, texture& source_texture, size_t target_mip_level = 0, size_t source_mip_level = 0) WAYLIB_TRY {
+			assert(target_mip_level <= mip_levels);
+			auto size = this->size() / vec2u(target_mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
+
+			wgpu::ImageCopyTexture source = wgpu::Default;
+			source.texture = source_texture.gpu_data;
+			source.mipLevel = source_mip_level;
+			wgpu::ImageCopyTexture destination = wgpu::Default;
+			destination.texture = gpu_data;
+			destination.mipLevel = target_mip_level;
+			static_cast<wgpu::CommandEncoder>(encoder).copyTextureToTexture(source, destination, {size.x, size.y, 1});
+			return this;
+		} WAYLIB_CATCH
+		result<texture*> copy(wgpu_state& state, texture& source_texture, size_t target_mip_level = 0, size_t source_mip_level = 0) WAYLIB_TRY {
+			auto_release encoder = state.device.createCommandEncoder(wgpu::Default);
+			if(auto res = copy_record_existing(encoder, source_texture, target_mip_level, source_mip_level); !res) return res;
+			auto_release commands = encoder.finish(wgpu::Default);
+			state.device.getQueue().submit(commands);
+			return this;
+		} WAYLIB_CATCH
+
+		result<texture*> generate_mipmaps(wgpu_state& state, uint32_t max_levels = 0);
+
+		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer = {});
 
 		result<texture*> blit(struct drawing_state& draw);
 		result<texture*> blit(struct drawing_state& draw, struct shader& blit_shader, bool dirty = false);
 
-		result<drawing_state> blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
-		result<drawing_state> blit_to(wgpu_state& state, struct shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
+		result<drawing_state> blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer = {});
+		result<drawing_state> blit_to(wgpu_state& state, struct shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer = {});
 	};
 
 
@@ -391,12 +511,10 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 
 		result<gpu_buffer*> copy(wgpu_state& state, const gpu_buffer& source) WAYLIB_TRY {
-			auto encoder = state.device.createCommandEncoder();
+			auto_release encoder = state.device.createCommandEncoder();
 			copy_record_existing(encoder, source);
-			auto commands = encoder.finish();
+			auto_release commands = encoder.finish();
 			state.device.getQueue().submit(commands);
-			commands.release();
-			encoder.release();
 			return this;
 		} WAYLIB_CATCH
 		inline std::future<result<gpu_buffer*>> copy_async(wgpu_state& state, const gpu_buffer& source, WAYLIB_OPTIONAL(size_t) initial_pool_size = {}) {
@@ -404,6 +522,29 @@ WAYLIB_BEGIN_NAMESPACE
 				return copy(state, source);
 			}, initial_pool_size, state, source);
 		}
+
+		result<gpu_buffer*> copy_to_texture_record_existing(WGPUCommandEncoder encoder, texture& target, size_t mip_level = 0) WAYLIB_TRY {
+			assert(mip_level <= target.mip_levels);
+			auto size = target.size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
+			
+			wgpu::ImageCopyBuffer source = wgpu::Default;
+			source.buffer = gpu_data;
+			source.layout.bytesPerRow = texture::bytes_per_pixel(target.format()) * size.x;
+			source.layout.offset = 0;
+			source.layout.rowsPerImage = size.y;
+			wgpu::ImageCopyTexture destination = wgpu::Default;
+			destination.texture = target.gpu_data;
+			destination.mipLevel = mip_level;
+			static_cast<wgpu::CommandEncoder>(encoder).copyBufferToTexture(source, destination, {size.x, size.y, 1});
+			return this;
+		} WAYLIB_CATCH
+		result<gpu_buffer*> copy_to_texture(wgpu_state& state, texture& target, size_t mip_level = 0) WAYLIB_TRY {
+			auto_release encoder = state.device.createCommandEncoder();
+			copy_to_texture_record_existing(encoder, target, mip_level);
+			auto_release commands = encoder.finish();
+			state.device.getQueue().submit(commands);
+			return this;
+		} WAYLIB_CATCH
 
 		// You must clear a landing pad for the data (set cpu_data to null) before calling this function
 		result<gpu_buffer*> download(wgpu_state& state, bool create_intermediate_gpu_buffer = true) WAYLIB_TRY {
@@ -462,42 +603,18 @@ WAYLIB_BEGIN_NAMESPACE
 			Gbuffer out = {};
 			if(config.color_format == wgpu::TextureFormat::Undefined && state.surface_format != wgpu::TextureFormat::Undefined)
 				config.color_format = state.surface_format;
-			out.color().gpu_data = state.device.createTexture(WGPUTextureDescriptor {
-				.label = "Waylib Color Buffer",
-				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
-				.dimension = wgpu::TextureDimension::_2D,
-				.size = {size.x, size.y, 1},
-				.format = config.color_format,
-				.mipLevelCount = 1,
-				.sampleCount = 1,
-				.viewFormatCount = 1,
-				.viewFormats = &config.color_format
-			});
-			out.color().create_view();
-			out.depth().gpu_data = state.device.createTexture(WGPUTextureDescriptor {
-				.label = "Waylib Depth Buffer",
-				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
-				.dimension = wgpu::TextureDimension::_2D,
-				.size = {size.x, size.y, 1},
-				.format = config.depth_format,
-				.mipLevelCount = 1,
-				.sampleCount = 1,
-				.viewFormatCount = 1,
-				.viewFormats = &config.depth_format
-			});
-			out.depth().create_view(wgpu::TextureAspect::DepthOnly);
-			out.normal().gpu_data = state.device.createTexture(WGPUTextureDescriptor {
-				.label = "Waylib Normal Buffer",
-				.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopySrc,
-				.dimension = wgpu::TextureDimension::_2D,
-				.size = {size.x, size.y, 1},
-				.format = config.normal_format,
-				.mipLevelCount = 1,
-				.sampleCount = 1,
-				.viewFormatCount = 1,
-				.viewFormats = &config.normal_format
-			});
-			out.normal().create_view();
+			auto res = texture::create(state, size,
+				{.format = config.color_format, .usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc, .sampler_type = texture_create_sampler_type::None}
+			); if(!res) return unexpected(res.error());
+			out.color() = *res;
+			res = texture::create(state, size,
+				{.format = config.depth_format, .usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc, .sampler_type = texture_create_sampler_type::None}
+			); if(!res) return unexpected(res.error());
+			out.depth() = *res;
+			res = texture::create(state, size,
+				{.format = config.normal_format, .usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc, .sampler_type = texture_create_sampler_type::None}
+			); if(!res) return unexpected(res.error());
+			out.normal() = *res;
 			return out;
 		} WAYLIB_CATCH
 
@@ -514,7 +631,7 @@ WAYLIB_BEGIN_NAMESPACE
 			};
 		}
 
-		wl::result<wgpu::BindGroup> bind_group(struct drawing_state& draw, struct material& mat);
+		result<wgpu::BindGroup> bind_group(struct drawing_state& draw, struct material& mat);
 
 		result<Gbuffer*> resize(wgpu_state& state, vec2u size) {
 			auto _new = create_default(state, size, {
@@ -529,7 +646,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return this;
 		}
 
-		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer = {});
+		result<struct drawing_state> begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer = {});
 	};
 
 	template<typename Tgbuffer>
@@ -786,7 +903,7 @@ WAYLIB_BEGIN_NAMESPACE
 				}
 				textureBindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
 					.label = "Waylib Compute Texture Bind Group",
-					.layout = pipeline.getBindGroupLayout(1),
+					.layout = pipeline.getBindGroupLayout(buffer_count > 0),
 					.entryCount = textureEntries.size(),
 					.entries = textureEntries.data()
 				});
@@ -796,7 +913,7 @@ WAYLIB_BEGIN_NAMESPACE
 			{
 				pass.setPipeline(pipeline);
 				if(bufferBindGroup) pass.setBindGroup(0, bufferBindGroup, 0, nullptr);
-				if(textureBindGroup) pass.setBindGroup(1, textureBindGroup, 0, nullptr);
+				if(textureBindGroup) pass.setBindGroup(buffer_count > 0, textureBindGroup, 0, nullptr);
 				pass.dispatchWorkgroups(workgroups.x, workgroups.y, workgroups.z);
 			}
 			if(end_pass) pass.end();
@@ -1137,7 +1254,7 @@ WAYLIB_BEGIN_NAMESPACE
 			if(*indices)
 				indexBuffer = gpu_buffer::create(state, {(std::byte*)*indices, triangle_count * sizeof(index_t) * 3}, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index);
 			else if(index_buffer) index_buffer.release();
-			if(!indexBuffer) return wl::unexpected(indexBuffer.error());
+			if(!indexBuffer) return unexpected(indexBuffer.error());
 
 			if(vertex_buffer) vertex_buffer.release();
 			vertex_buffer = buffer.gpu_data;
@@ -1326,7 +1443,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
+		result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
 			// struct utility_data {
 			// 	frame_time_data time; // at byte offset 0
 			// 	float _pad0;
@@ -1373,7 +1490,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
+		result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
 			// struct utility_data {
 			// 	frame_time_data time; // at byte offset 0
 			// 	float _pad0;
@@ -1421,7 +1538,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
+		result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}) {
 			// struct utility_data {
 			// 	frame_time_data time; // at byte offset 0
 			// 	float _pad0;
@@ -1456,7 +1573,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		static wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, std::span<light> lights, gpu_buffer utility_buffer = {}, bool skip_resize_copy = false) {
+		static result<gpu_buffer> update_utility_buffer(wgpu_state& state, std::span<light> lights, gpu_buffer utility_buffer = {}, bool skip_resize_copy = false) {
 			// struct utility_data {
 			// 	frame_time_data time; // at byte offset 0
 			// 	float _pad0;
@@ -1477,7 +1594,7 @@ WAYLIB_BEGIN_NAMESPACE
 			utility_buffer.write<light>(state, lights, 208);
 			return utility_buffer;
 		}
-		wl::result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}, bool skip_resize_copy = false) {
+		result<gpu_buffer> update_utility_buffer(wgpu_state& state, gpu_buffer utility_buffer = {}, bool skip_resize_copy = false) {
 			return update_utility_buffer(state, {this, 1}, utility_buffer, skip_resize_copy);
 		}
 	};

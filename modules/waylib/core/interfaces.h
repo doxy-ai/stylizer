@@ -119,6 +119,14 @@ typedef WAYLIB_PREFIXED_C_CPP_TYPE(vec4f, vec4fC) WAYLIB_PREFIXED_C_CPP_TYPE(col
 #endif
 
 typedef struct {
+	uint8_t r, g, b, a;
+} WAYLIB_PREFIXED_C_CPP_TYPE(color8, color8C);
+
+#ifdef __cplusplus
+	inline WGPUColor toWGPU(const color8C& c) { return {c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f}; }
+#endif
+
+typedef struct {
 	float m0, m4, m8, m12;      // Matrix first row (4 components)
 	float m1, m5, m9, m13;      // Matrix second row (4 components)
 	float m2, m6, m10, m14;     // Matrix third row (4 components)
@@ -162,9 +170,40 @@ typedef struct {
 	;
 } WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC);
 
-// Texture
+WAYLIB_ENUM image_format {
+	C_PREPEND(IMAGE_FORMAT_, Invalid) = 0,
+	C_PREPEND(IMAGE_FORMAT_, RGBA),
+	C_PREPEND(IMAGE_FORMAT_, RGBA8),
+	C_PREPEND(IMAGE_FORMAT_, Gray),
+	C_PREPEND(IMAGE_FORMAT_, Gray8),
+	// TODO: Support compressed formats
+};
+
+// Image (CPU texture data)
 typedef struct {
-	// WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(image*)) image;
+	image_format format;
+	union {
+		WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC)*) rgba;
+		WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(color8, color8C)*) rgba8;
+		WAYLIB_MANAGEABLE(float*) gray;
+		WAYLIB_MANAGEABLE(uint8_t*) gray8;
+		WAYLIB_MANAGEABLE(void*) data
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+			= nullptr
+#endif
+		;
+	};
+	WAYLIB_PREFIXED(vec2u) size;
+	size_t frames;
+} WAYLIB_PREFIXED_C_CPP_TYPE(image, imageC);
+
+// Texture (GPU texture data)
+typedef struct {
+	uint32_t mip_levels
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= 1
+#endif
+	; WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(image, imageC)*)) cpu_data;
 	WAYLIB_C_OR_CPP_TYPE(WGPUTexture, wgpu::Texture) gpu_data;
 	WAYLIB_C_OR_CPP_TYPE(WGPUTextureView, wgpu::TextureView) view;
 	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUSampler, wgpu::Sampler)) sampler
@@ -353,12 +392,12 @@ typedef struct {
 	float _pad1;
 } WAYLIB_PREFIXED_C_CPP_TYPE(camera2D, camera2DC);
 
-enum light_type {
-	Ambient = 0,
-	Directional,
-	Point,
-	Spot,
-	Force32 = 0x7FFFFFFF
+WAYLIB_ENUM light_type {
+	C_PREPEND(LIGHT_TYPE_, Ambient) = 0,
+	C_PREPEND(LIGHT_TYPE_, Directional),
+	C_PREPEND(LIGHT_TYPE_, Point),
+	C_PREPEND(LIGHT_TYPE_, Spot),
+	C_PREPEND(LIGHT_TYPE_, Force32) = 0x7FFFFFFF
 };
 
 typedef struct {
@@ -405,6 +444,40 @@ typedef struct {
 #endif
 	;
 } WAYLIB_PREFIXED(surface_configuration);
+
+WAYLIB_ENUM texture_create_sampler_type {
+	C_PREPEND(TEXTURE_CREATE_SAMPLER_TYPE_, None) = 0,
+	C_PREPEND(TEXTURE_CREATE_SAMPLER_TYPE_, Nearest),
+	C_PREPEND(TEXTURE_CREATE_SAMPLER_TYPE_, Trilinear),
+};
+
+typedef struct {
+	WAYLIB_OPTIONAL(WGPUTextureFormat) format
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= {}
+#endif
+	; WGPUTextureDimension dimension
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= wgpu::TextureDimension::_2D
+#endif
+	; WGPUTextureUsage usage
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= wgpu::TextureUsage::CopySrc | wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding
+#endif
+	; bool with_view
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= true
+#endif
+	; texture_create_sampler_type sampler_type
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= texture_create_sampler_type::Nearest
+#endif
+	; uint32_t mip_levels
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= 1
+#endif
+	; 
+} WAYLIB_PREFIXED(texture_create_configuation);
 
 typedef struct {
 	WGPUTextureFormat color_format

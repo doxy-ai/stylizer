@@ -7,6 +7,9 @@
 	#define WAYLIB_C_OR_CPP_TYPE(Ctype, CPPtype) Ctype
 #endif
 
+#define WAYLIB_ENUM WAYLIB_C_OR_CPP_TYPE(enum, enum class)
+#define C_PREPEND(pre, base) WAYLIB_C_OR_CPP_TYPE(pre##base, base)
+
 #ifdef WAYLIB_C_PREFIX
 	#define WAYLIB_PREFIXED(name) WAYLIB_C_PREFIX ## name
 #else

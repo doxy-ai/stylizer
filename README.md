@@ -7,7 +7,7 @@ Waylib is heavily inspired by Raylib (the title was originally WebGPU Raylib) bu
 Additionally the engine is designed around being increadibly modular, this library includes several such modules all of which can be ignored if desired:
 1) Core - WebGPU integrations and core rendering code, the core of the engine which every module assumes is present. Also provides some interface structures which other modules are expected to adhere to.
 2) Window - Module which creates a window (using GFLW) and an associated surface to render to.
-3) Image - Provides simple generic image loading of common texture formats like png, jpg, and hdr.
+3) IMG - Provides simple generic image loading of common texture formats like png, jpg, and hdr (stb_image formats).
 4) OBJ - Provides a simple obj model loader.
 
 ## License

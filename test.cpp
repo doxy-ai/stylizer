@@ -45,6 +45,10 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	model.c().materials = &material;
 	model.c().mesh_materials = nullptr;
 
+	wl::auto_release texture = std::move(*wl::img::load("../resources/test.hdr").throw_if_error()
+		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear}).throw_if_error()
+		.generate_mipmaps(state).throw_if_error());
+
 	wl::auto_release<wl::gpu_buffer> utility_buffer;
 	wl::time time{};
 	wl::camera3D camera = wl::camera3DC{.position = {1, 2, 3}, .target_position = wl::vec3f(0), .up = {0, 1, 0}};

@@ -1,3 +1,4 @@
+#include "webgpu/webgpu.h"
 #define TCPP_IMPLEMENTATION
 #define WEBGPU_CPP_IMPLEMENTATION
 #define IS_WAYLIB_CORE_CPP
@@ -13,6 +14,7 @@ WAYLIB_BEGIN_NAMESPACE
 // # Errors
 //////////////////////////////////////////////////////////////////////
 
+
 	std::string errors::singleton;
 
 	WAYLIB_NULLABLE(const char*) get_error_message() {
@@ -23,9 +25,11 @@ WAYLIB_BEGIN_NAMESPACE
 		errors::clear();
 	}
 
+
 //////////////////////////////////////////////////////////////////////
 // # Thread Pool
 //////////////////////////////////////////////////////////////////////
+
 
 	WAYLIB_NULLABLE(WAYLIB_PREFIXED(thread_pool_future)*) WAYLIB_PREFIXED(thread_pool_enqueue)(
 		void(*function)(),
@@ -136,7 +140,7 @@ result<texture> wgpu_state::current_surface_texture() {
 	return out;
 }
 
-result<struct drawing_state> wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */){
+result<struct drawing_state> wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */){
 	auto texture = current_surface_texture();
 	if(!texture) return unexpected(texture.error());
 	return texture->begin_drawing(*this, clear_color, utility_buffer);
@@ -198,11 +202,401 @@ WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC)) WAYLI
 
 
 //////////////////////////////////////////////////////////////////////
+// # Image
+//////////////////////////////////////////////////////////////////////
+
+
+result<struct texture> image::upload(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
+	config.format = config.format ? *config.format : static_cast<WGPUTextureFormat>(convert_format(format));
+	auto out = texture::create(state, size, config);
+	if(!out) return out;
+
+	wgpu::ImageCopyTexture destination;
+	destination.texture = out->gpu_data;
+	destination.mipLevel = 0;
+	destination.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
+	destination.aspect = wgpu::TextureAspect::All; // only relevant for depth/Stencil textures
+
+	// Arguments telling how the C++ side pixel memory is laid out
+	wgpu::TextureDataLayout source;
+	source.offset = 0;
+	source.bytesPerRow = bytes_per_pixel() * size.x;
+	source.rowsPerImage = size.y;
+
+	wgpu::Extent3D extent = {size.x, size.y, static_cast<uint32_t>(frames)};
+	state.device.getQueue().writeTexture(destination, *data, source.bytesPerRow * size.y * frames, source, extent);
+
+	if(take_ownership_of_image) out->cpu_data = {true, new image(std::move(*this))};
+	else out->cpu_data = this;
+	return out;
+}
+
+
+//////////////////////////////////////////////////////////////////////
 // # Texture
 //////////////////////////////////////////////////////////////////////
 
 
-result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
+size_t texture::bytes_per_pixel(WGPUTextureFormat format) { // TODO: complete
+	switch(static_cast<wgpu::TextureFormat>(format)) {
+		case WGPUTextureFormat_R8Unorm: return sizeof(uint8_t);
+		case WGPUTextureFormat_R8Snorm: return sizeof(int8_t);
+		case WGPUTextureFormat_R8Uint: return sizeof(uint8_t);
+		case WGPUTextureFormat_R8Sint: return sizeof(int8_t);
+		case WGPUTextureFormat_R16Uint: return sizeof(uint16_t);
+		case WGPUTextureFormat_R16Sint: return sizeof(int16_t);
+		case WGPUTextureFormat_R16Float: return sizeof(int16_t);
+		// case WGPUTextureFormat_RG8Unorm:
+		// case WGPUTextureFormat_RG8Snorm:
+		// case WGPUTextureFormat_RG8Uint:
+		// case WGPUTextureFormat_RG8Sint:
+		// case WGPUTextureFormat_R32Float:
+		// case WGPUTextureFormat_R32Uint:
+		// case WGPUTextureFormat_R32Sint:
+		// case WGPUTextureFormat_RG16Uint:
+		// case WGPUTextureFormat_RG16Sint:
+		// case WGPUTextureFormat_RG16Float:
+		case WGPUTextureFormat_RGBA8Unorm: return sizeof(uint8_t) * 4;
+		case WGPUTextureFormat_RGBA8UnormSrgb: return sizeof(uint8_t) * 4;
+		case WGPUTextureFormat_RGBA8Snorm: return sizeof(int8_t) * 4;
+		case WGPUTextureFormat_RGBA8Uint: return sizeof(uint8_t) * 4;
+		case WGPUTextureFormat_RGBA8Sint: return sizeof(int8_t) * 4;
+		case WGPUTextureFormat_BGRA8Unorm: return sizeof(uint8_t) * 4;
+		case WGPUTextureFormat_BGRA8UnormSrgb: return sizeof(uint8_t) * 4;
+		// case WGPUTextureFormat_RGB10A2Uint:
+		// case WGPUTextureFormat_RGB10A2Unorm:
+		// case WGPUTextureFormat_RG11B10Ufloat:
+		// case WGPUTextureFormat_RGB9E5Ufloat:
+		// case WGPUTextureFormat_RG32Float:
+		// case WGPUTextureFormat_RG32Uint:
+		// case WGPUTextureFormat_RG32Sint:
+		// case WGPUTextureFormat_RGBA16Uint:
+		// case WGPUTextureFormat_RGBA16Sint:
+		// case WGPUTextureFormat_RGBA16Float:
+		// case WGPUTextureFormat_RGBA32Float:
+		// case WGPUTextureFormat_RGBA32Uint:
+		// case WGPUTextureFormat_RGBA32Sint:
+		// case WGPUTextureFormat_Stencil8:
+		// case WGPUTextureFormat_Depth16Unorm:
+		// case WGPUTextureFormat_Depth24Plus:
+		// case WGPUTextureFormat_Depth24PlusStencil8:
+		// case WGPUTextureFormat_Depth32Float:
+		// case WGPUTextureFormat_Depth32FloatStencil8:
+		// case WGPUTextureFormat_BC1RGBAUnorm:
+		// case WGPUTextureFormat_BC1RGBAUnormSrgb:
+		// case WGPUTextureFormat_BC2RGBAUnorm:
+		// case WGPUTextureFormat_BC2RGBAUnormSrgb:
+		// case WGPUTextureFormat_BC3RGBAUnorm:
+		// case WGPUTextureFormat_BC3RGBAUnormSrgb:
+		// case WGPUTextureFormat_BC4RUnorm:
+		// case WGPUTextureFormat_BC4RSnorm:
+		// case WGPUTextureFormat_BC5RGUnorm:
+		// case WGPUTextureFormat_BC5RGSnorm:
+		// case WGPUTextureFormat_BC6HRGBUfloat:
+		// case WGPUTextureFormat_BC6HRGBFloat:
+		// case WGPUTextureFormat_BC7RGBAUnorm:
+		// case WGPUTextureFormat_BC7RGBAUnormSrgb:
+		// case WGPUTextureFormat_ETC2RGB8Unorm:
+		// case WGPUTextureFormat_ETC2RGB8UnormSrgb:
+		// case WGPUTextureFormat_ETC2RGB8A1Unorm:
+		// case WGPUTextureFormat_ETC2RGB8A1UnormSrgb:
+		// case WGPUTextureFormat_ETC2RGBA8Unorm:
+		// case WGPUTextureFormat_ETC2RGBA8UnormSrgb:
+		// case WGPUTextureFormat_EACR11Unorm:
+		// case WGPUTextureFormat_EACR11Snorm:
+		// case WGPUTextureFormat_EACRG11Unorm:
+		// case WGPUTextureFormat_EACRG11Snorm:
+		// case WGPUTextureFormat_ASTC4x4Unorm:
+		// case WGPUTextureFormat_ASTC4x4UnormSrgb:
+		// case WGPUTextureFormat_ASTC5x4Unorm:
+		// case WGPUTextureFormat_ASTC5x4UnormSrgb:
+		// case WGPUTextureFormat_ASTC5x5Unorm:
+		// case WGPUTextureFormat_ASTC5x5UnormSrgb:
+		// case WGPUTextureFormat_ASTC6x5Unorm:
+		// case WGPUTextureFormat_ASTC6x5UnormSrgb:
+		// case WGPUTextureFormat_ASTC6x6Unorm:
+		// case WGPUTextureFormat_ASTC6x6UnormSrgb:
+		// case WGPUTextureFormat_ASTC8x5Unorm:
+		// case WGPUTextureFormat_ASTC8x5UnormSrgb:
+		// case WGPUTextureFormat_ASTC8x6Unorm:
+		// case WGPUTextureFormat_ASTC8x6UnormSrgb:
+		// case WGPUTextureFormat_ASTC8x8Unorm:
+		// case WGPUTextureFormat_ASTC8x8UnormSrgb:
+		// case WGPUTextureFormat_ASTC10x5Unorm:
+		// case WGPUTextureFormat_ASTC10x5UnormSrgb:
+		// case WGPUTextureFormat_ASTC10x6Unorm:
+		// case WGPUTextureFormat_ASTC10x6UnormSrgb:
+		// case WGPUTextureFormat_ASTC10x8Unorm:
+		// case WGPUTextureFormat_ASTC10x8UnormSrgb:
+		// case WGPUTextureFormat_ASTC10x10Unorm:
+		// case WGPUTextureFormat_ASTC10x10UnormSrgb:
+		// case WGPUTextureFormat_ASTC12x10Unorm:
+		// case WGPUTextureFormat_ASTC12x10UnormSrgb:
+		// case WGPUTextureFormat_ASTC12x12Unorm:
+		// case WGPUTextureFormat_ASTC12x12UnormSrgb:
+		// case WGPUTextureFormat_R16Unorm:
+		// case WGPUTextureFormat_RG16Unorm:
+		// case WGPUTextureFormat_RGBA16Unorm:
+		// case WGPUTextureFormat_R16Snorm:
+		// case WGPUTextureFormat_RG16Snorm:
+		// case WGPUTextureFormat_RGBA16Snorm:
+		// case WGPUTextureFormat_R8BG8Biplanar420Unorm:
+		// case WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm:
+		// case WGPUTextureFormat_R8BG8A8Triplanar420Unorm:
+		// case WGPUTextureFormat_R8BG8Biplanar422Unorm:
+		// case WGPUTextureFormat_R8BG8Biplanar444Unorm:
+		// case WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm:
+		// case WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm:
+		// case WGPUTextureFormat_External:
+		// case WGPUTextureFormat_Force32:
+		default: return 0;
+	}
+}
+
+wgpu::TextureFormat texture::format_remove_srgb(WGPUTextureFormat format) {
+	switch(static_cast<wgpu::TextureFormat>(format)) {
+		case WGPUTextureFormat_RGBA8UnormSrgb: return WGPUTextureFormat_RGBA8Unorm;
+		case WGPUTextureFormat_BGRA8UnormSrgb: return WGPUTextureFormat_BGRA8Unorm;
+		case WGPUTextureFormat_BC1RGBAUnormSrgb: return WGPUTextureFormat_BC1RGBAUnorm;
+		case WGPUTextureFormat_BC2RGBAUnormSrgb: return WGPUTextureFormat_BC2RGBAUnorm;
+		case WGPUTextureFormat_BC3RGBAUnormSrgb: return WGPUTextureFormat_BC3RGBAUnorm;
+		case WGPUTextureFormat_BC7RGBAUnormSrgb: return WGPUTextureFormat_BC7RGBAUnormSrgb;
+		case WGPUTextureFormat_ETC2RGB8UnormSrgb: return WGPUTextureFormat_ETC2RGB8UnormSrgb;
+		case WGPUTextureFormat_ETC2RGB8A1UnormSrgb: return WGPUTextureFormat_ETC2RGB8A1UnormSrgb;
+		case WGPUTextureFormat_ETC2RGBA8UnormSrgb: return WGPUTextureFormat_ETC2RGBA8UnormSrgb;
+		case WGPUTextureFormat_ASTC4x4UnormSrgb: return WGPUTextureFormat_ASTC4x4Unorm;
+		case WGPUTextureFormat_ASTC5x4UnormSrgb: return WGPUTextureFormat_ASTC5x4Unorm;
+		case WGPUTextureFormat_ASTC5x5UnormSrgb: return WGPUTextureFormat_ASTC5x5Unorm;
+		case WGPUTextureFormat_ASTC6x5UnormSrgb: return WGPUTextureFormat_ASTC6x5Unorm;
+		case WGPUTextureFormat_ASTC6x6UnormSrgb: return WGPUTextureFormat_ASTC6x6Unorm;
+		case WGPUTextureFormat_ASTC8x5UnormSrgb: return WGPUTextureFormat_ASTC8x5Unorm;
+		case WGPUTextureFormat_ASTC8x6UnormSrgb: return WGPUTextureFormat_ASTC8x6Unorm;
+		case WGPUTextureFormat_ASTC8x8UnormSrgb: return WGPUTextureFormat_ASTC8x8Unorm;
+		case WGPUTextureFormat_ASTC10x5UnormSrgb: return WGPUTextureFormat_ASTC10x5Unorm;
+		case WGPUTextureFormat_ASTC10x6UnormSrgb: return WGPUTextureFormat_ASTC10x6Unorm;
+		case WGPUTextureFormat_ASTC10x8UnormSrgb: return WGPUTextureFormat_ASTC10x8Unorm;
+		case WGPUTextureFormat_ASTC10x10UnormSrgb: return WGPUTextureFormat_ASTC10x10Unorm;
+		case WGPUTextureFormat_ASTC12x10UnormSrgb: return WGPUTextureFormat_ASTC12x10Unorm;
+		case WGPUTextureFormat_ASTC12x12UnormSrgb: return WGPUTextureFormat_ASTC12x12Unorm;
+		default: return format;
+	}
+}
+
+const char* texture::format_to_string(WGPUTextureFormat format) {
+	switch(static_cast<wgpu::TextureFormat>(format)) {
+		case WGPUTextureFormat_R8Unorm: return "r8unorm";
+		case WGPUTextureFormat_R8Snorm: return "r8snorm";
+		case WGPUTextureFormat_R8Uint: return "r8uint";
+		case WGPUTextureFormat_R8Sint: return "r8sint";
+		case WGPUTextureFormat_R16Uint: return "r16uint";
+		case WGPUTextureFormat_R16Sint: return "r16sint";
+		case WGPUTextureFormat_R16Float: return "r16float";
+		case WGPUTextureFormat_RG8Unorm: return "rg8unorm";
+		case WGPUTextureFormat_RG8Snorm: return "rg8snorm";
+		case WGPUTextureFormat_RG8Uint: return "rg8uint";
+		case WGPUTextureFormat_RG8Sint: return "rg8sint";
+		case WGPUTextureFormat_R32Float: return "r32float";
+		case WGPUTextureFormat_R32Uint: return "r32uint";
+		case WGPUTextureFormat_R32Sint: return "r32sint";
+		case WGPUTextureFormat_RG16Uint: return "rg16uint";
+		case WGPUTextureFormat_RG16Sint: return "rg16sint";
+		case WGPUTextureFormat_RG16Float: return "rg16float";
+		case WGPUTextureFormat_RGBA8Unorm: return "rgba8unorm";
+		case WGPUTextureFormat_RGBA8UnormSrgb: return "rgba8unorm";
+		case WGPUTextureFormat_RGBA8Snorm: return "rgba8snorm";
+		case WGPUTextureFormat_RGBA8Uint: return "rgba8uint";
+		case WGPUTextureFormat_RGBA8Sint: return "rgba8sint";
+		case WGPUTextureFormat_BGRA8Unorm: return "bgra8unorm";
+		case WGPUTextureFormat_BGRA8UnormSrgb: return "bgra8unorm";
+		case WGPUTextureFormat_RGB10A2Uint: return "rgb10a2uint";
+		case WGPUTextureFormat_RGB10A2Unorm: return "rgb10a2unorm";
+		case WGPUTextureFormat_RG11B10Ufloat: return "rg11b10ufloat";
+		case WGPUTextureFormat_RGB9E5Ufloat: return "rgb9e5ufloat";
+		case WGPUTextureFormat_RG32Float: return "rg32float";
+		case WGPUTextureFormat_RG32Uint: return "rg32uint";
+		case WGPUTextureFormat_RG32Sint: return "rg32sint";
+		case WGPUTextureFormat_RGBA16Uint: return "rgba16uint";
+		case WGPUTextureFormat_RGBA16Sint: return "rgba16sint";
+		case WGPUTextureFormat_RGBA16Float: return "rgba16float";
+		case WGPUTextureFormat_RGBA32Float: return "rgba32float";
+		case WGPUTextureFormat_RGBA32Uint: return "rgba32uint";
+		case WGPUTextureFormat_RGBA32Sint: return "rgba32sint";
+		case WGPUTextureFormat_Stencil8: return "stencil8";
+		case WGPUTextureFormat_Depth16Unorm: return "depth16unorm";
+		case WGPUTextureFormat_Depth24Plus: return "depth24plus";
+		case WGPUTextureFormat_Depth24PlusStencil8: return "depth24plusstencil8";
+		case WGPUTextureFormat_Depth32Float: return "depth32float";
+		case WGPUTextureFormat_Depth32FloatStencil8: return "depth32floatstencil8";
+		case WGPUTextureFormat_BC1RGBAUnorm: return "bc1rgbaunorm";
+		case WGPUTextureFormat_BC1RGBAUnormSrgb: return "bc1rgbaunorm";
+		case WGPUTextureFormat_BC2RGBAUnorm: return "bc2rgbaunorm";
+		case WGPUTextureFormat_BC2RGBAUnormSrgb: return "bc2rgbaunorm";
+		case WGPUTextureFormat_BC3RGBAUnorm: return "bc3rgbaunorm";
+		case WGPUTextureFormat_BC3RGBAUnormSrgb: return "bc3rgbaunorm";
+		case WGPUTextureFormat_BC4RUnorm: return "bc4runorm";
+		case WGPUTextureFormat_BC4RSnorm: return "bc4rsnorm";
+		case WGPUTextureFormat_BC5RGUnorm: return "bc5rgunorm";
+		case WGPUTextureFormat_BC5RGSnorm: return "bc5rgsnorm";
+		case WGPUTextureFormat_BC6HRGBUfloat: return "bc6hrgbufloat";
+		case WGPUTextureFormat_BC6HRGBFloat: return "bc6hrgbfloat";
+		case WGPUTextureFormat_BC7RGBAUnorm: return "bc7rgbaunorm";
+		case WGPUTextureFormat_BC7RGBAUnormSrgb: return "bc7rgbaunorm";
+		case WGPUTextureFormat_ETC2RGB8Unorm: return "etc2rgb8unorm";
+		case WGPUTextureFormat_ETC2RGB8UnormSrgb: return "etc2rgb8unorm";
+		case WGPUTextureFormat_ETC2RGB8A1Unorm: return "etc2rgb8a1unorm";
+		case WGPUTextureFormat_ETC2RGB8A1UnormSrgb: return "etc2rgb8a1unorm";
+		case WGPUTextureFormat_ETC2RGBA8Unorm: return "etc2rgba8unorm";
+		case WGPUTextureFormat_ETC2RGBA8UnormSrgb: return "etc2rgba8unorm";
+		case WGPUTextureFormat_EACR11Unorm: return "eacr11unorm";
+		case WGPUTextureFormat_EACR11Snorm: return "eacr11snorm";
+		case WGPUTextureFormat_EACRG11Unorm: return "eacrg11unorm";
+		case WGPUTextureFormat_EACRG11Snorm: return "eacrg11snorm";
+		case WGPUTextureFormat_ASTC4x4Unorm: return "astc4x4unorm";
+		case WGPUTextureFormat_ASTC4x4UnormSrgb: return "astc4x4unorm";
+		case WGPUTextureFormat_ASTC5x4Unorm: return "astc5x4unorm";
+		case WGPUTextureFormat_ASTC5x4UnormSrgb: return "astc5x4unorm";
+		case WGPUTextureFormat_ASTC5x5Unorm: return "astc5x5unorm";
+		case WGPUTextureFormat_ASTC5x5UnormSrgb: return "astc5x5unorm";
+		case WGPUTextureFormat_ASTC6x5Unorm: return "astc6x5unorm";
+		case WGPUTextureFormat_ASTC6x5UnormSrgb: return "astc6x5unorm";
+		case WGPUTextureFormat_ASTC6x6Unorm: return "astc6x6unorm";
+		case WGPUTextureFormat_ASTC6x6UnormSrgb: return "astc6x6unorm";
+		case WGPUTextureFormat_ASTC8x5Unorm: return "astc8x5unorm";
+		case WGPUTextureFormat_ASTC8x5UnormSrgb: return "astc8x5unorm";
+		case WGPUTextureFormat_ASTC8x6Unorm: return "astc8x6unorm";
+		case WGPUTextureFormat_ASTC8x6UnormSrgb: return "astc8x6unorm";
+		case WGPUTextureFormat_ASTC8x8Unorm: return "astc8x8unorm";
+		case WGPUTextureFormat_ASTC8x8UnormSrgb: return "astc8x8unorm";
+		case WGPUTextureFormat_ASTC10x5Unorm: return "astc10x5unorm";
+		case WGPUTextureFormat_ASTC10x5UnormSrgb: return "astc10x5unorm";
+		case WGPUTextureFormat_ASTC10x6Unorm: return "astc10x6unorm";
+		case WGPUTextureFormat_ASTC10x6UnormSrgb: return "astc10x6unorm";
+		case WGPUTextureFormat_ASTC10x8Unorm: return "astc10x8unorm";
+		case WGPUTextureFormat_ASTC10x8UnormSrgb: return "astc10x8unorm";
+		case WGPUTextureFormat_ASTC10x10Unorm: return "astc10x10unorm";
+		case WGPUTextureFormat_ASTC10x10UnormSrgb: return "astc10x10unorm";
+		case WGPUTextureFormat_ASTC12x10Unorm: return "astc12x10unorm";
+		case WGPUTextureFormat_ASTC12x10UnormSrgb: return "astc12x10unorm";
+		case WGPUTextureFormat_ASTC12x12Unorm: return "astc12x12unorm";
+		case WGPUTextureFormat_ASTC12x12UnormSrgb: return "astc12x12unorm";
+		case WGPUTextureFormat_R16Unorm: return "r16unorm";
+		case WGPUTextureFormat_RG16Unorm: return "rg16unorm";
+		case WGPUTextureFormat_RGBA16Unorm: return "rgba16unorm";
+		case WGPUTextureFormat_R16Snorm: return "r16snorm";
+		case WGPUTextureFormat_RG16Snorm: return "rg16snorm";
+		case WGPUTextureFormat_RGBA16Snorm: return "rgba16snorm";
+		case WGPUTextureFormat_R8BG8Biplanar420Unorm: return "r8bg8biplanar420unorm";
+		case WGPUTextureFormat_R10X6BG10X6Biplanar420Unorm: return "r10x6bg10x6biplanar420unorm";
+		case WGPUTextureFormat_R8BG8A8Triplanar420Unorm: return "r8bg8a8triplanar420unorm";
+		case WGPUTextureFormat_R8BG8Biplanar422Unorm: return "r8bg8biplanar422unorm";
+		case WGPUTextureFormat_R8BG8Biplanar444Unorm: return "r8bg8biplanar444unorm";
+		case WGPUTextureFormat_R10X6BG10X6Biplanar422Unorm: return "r10x6bg10x6biplanar422unorm";
+		case WGPUTextureFormat_R10X6BG10X6Biplanar444Unorm: return "r10x6bg10x6biplanar444unorm";
+		case WGPUTextureFormat_External: return "external";
+		case WGPUTextureFormat_Force32: return "force32";
+		default: return 0;
+	}
+}
+
+result<texture*> texture::copy_to_buffer_record_existing(WGPUCommandEncoder encoder, gpu_buffer& buffer, size_t mip_level /* = 0 */) WAYLIB_TRY {
+	assert(mip_level <= mip_levels);
+	auto size = this->size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
+
+	wgpu::ImageCopyTexture source = wgpu::Default;
+	source.texture = gpu_data;
+	source.mipLevel = mip_level;
+	wgpu::ImageCopyBuffer destination = wgpu::Default;
+	destination.buffer = buffer.gpu_data;
+	destination.layout.bytesPerRow = bytes_per_pixel(format()) * size.x;
+	destination.layout.offset = 0;
+	destination.layout.rowsPerImage = size.y;
+	static_cast<wgpu::CommandEncoder>(encoder).copyTextureToBuffer(source, destination, { size.x, size.y, 1 });
+	return this;
+} WAYLIB_CATCH
+
+result<image> texture::download(wgpu_state& state, image_format format /* = image_format::RGBA8 */, size_t mip_level /* = 0 */) WAYLIB_TRY {
+	auto size = this->size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
+	gpu_buffer buffer = gpu_bufferC{.size = bytes_per_pixel(this->format()) * size.x * size.y};
+	if(auto res = buffer.upload(state, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead); !res) return unexpected(res.error());
+	if(auto res = copy_to_buffer(state, buffer); !res) return unexpected(res.error());
+	if(auto res = buffer.download(state, false); !res) return unexpected(res.error());
+
+	image out;
+	out.format = format;
+	out.gray8 = std::exchange(buffer.cpu_data, nullptr);
+	out.size = size;
+	out.frames = 1;
+	return out;
+} WAYLIB_CATCH
+
+result<texture*> texture::generate_mipmaps(wgpu_state& state, uint32_t max_levels /* = 0 */) { // 0 -> no maximum
+	auto size = this->size();
+	if(max_levels == 0) max_levels = std::bit_width(std::min(size.x, size.y));
+	mip_levels = max_levels;
+
+	auto format = this->format();
+	auto formatStr = std::string(format_to_string(format));
+	auto tmpMipShader = shader::from_wgsl(state, R"_(
+@group(0) @binding(0) var previousMipLevel: texture_2d<f32>;
+@group(0) @binding(1) var nextMipLevel: texture_storage_2d<)_" + formatStr + R"_(, write>;
+
+@compute @workgroup_size(8, 8)
+fn computeMipMap(@builtin(global_invocation_id) id: vec3<u32>) {
+    let offset = vec2<u32>(0, 1);
+    let color = (
+        textureLoad(previousMipLevel, 2 * id.xy + offset.xx, 0) +
+        textureLoad(previousMipLevel, 2 * id.xy + offset.xy, 0) +
+        textureLoad(previousMipLevel, 2 * id.xy + offset.yx, 0) +
+        textureLoad(previousMipLevel, 2 * id.xy + offset.yy, 0)
+    ) * 0.25;
+    textureStore(nextMipLevel, id.xy, color);
+})_");
+	if(!tmpMipShader) return unexpected(tmpMipShader.error());
+	wl::auto_release mipShader = std::move(*tmpMipShader);
+
+	auto newTexture = create(state, size, {.format = {format_remove_srgb(format)}, .usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::StorageBinding, .mip_levels = mip_levels});
+	if(!newTexture) return unexpected(newTexture.error());
+	if(auto res = newTexture->copy(state, *this); !res) return res;
+
+	result<wgpu::TextureView> tmpView;
+	if(tmpView = newTexture->create_mip_view(0); !tmpView) return unexpected(tmpView.error());
+	auto previousView = *tmpView;
+	if(tmpView = newTexture->create_mip_view(1); !tmpView) return unexpected(tmpView.error());
+	auto nextView = *tmpView;
+	std::array<texture, 2> textures {textureC{.view = previousView}, textureC{.view = nextView}};
+
+	computer compute = computerC{
+		.buffer_count = 0,
+		.texture_count = textures.size(),
+		.textures = textures.data(),
+		.shader = &mipShader,
+	};
+	compute.upload(state, {"Waylib Mipmap Computer"});
+
+	// wgpu::Extent3D mipLevelSize = {size.x, size.y, 1}; // TOOD: do we need a tweak to properly handle cubemaps?
+	for (uint32_t level = 1; level < mip_levels; ++level) {
+		vec2u invocationCount = size / vec2u(2);
+		constexpr uint32_t workgroupSizePerDim = 8;
+
+		compute.dispatch(state, vec3u((invocationCount + vec2u(workgroupSizePerDim) - vec2u(1)) / vec2u(workgroupSizePerDim), 1));
+
+		if(level < mip_levels - 1) {
+			textures[0].view = textures[1].view;
+			if(tmpView = newTexture->create_mip_view(level + 1); !tmpView) return unexpected(tmpView.error());
+			textures[1].view = *tmpView;
+			size = size / vec2u(2);
+		}
+	}
+
+	if(view) newTexture->create_view();
+	if(sampler) newTexture->sampler = sampler;
+
+	release();
+	(*this) = std::move(*newTexture);
+	return this;
+}
+
+result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
 	static WGPUTextureViewDescriptor viewDesc = {
 		// .format = color.getFormat(),
 		.dimension = wgpu::TextureViewDimension::_2D,
@@ -360,7 +754,7 @@ fn fragment(vert: vertex_output) -> @location(0) vec4f {
 	return blit(draw, blitShader, false);
 }
 
-result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) {
+result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
 	if(!draw) return unexpected(draw.error());
 	blit(*draw);
@@ -368,7 +762,7 @@ result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLI
 	return draw;
 }
 
-result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) {
+result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
 	if(!draw) return unexpected(draw.error());
 	blit(*draw, blit_shader);
@@ -382,7 +776,7 @@ result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, t
 //////////////////////////////////////////////////////////////////////
 
 
-wl::result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
+result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
 	auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), minimum_utility_buffer_size);
 	if(!zeroBuffer) return unexpected(zeroBuffer.error());
 
@@ -407,7 +801,7 @@ wl::result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, stru
 	});
 }
 
-result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(wl::gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
+result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
 	drawing_stateC out {.state = &state, .gbuffer = this};
 	// static frame_finalizers finalizers;
 

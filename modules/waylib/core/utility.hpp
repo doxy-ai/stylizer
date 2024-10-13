@@ -196,4 +196,5 @@ WAYLIB_BEGIN_NAMESPACE
 		return *(float*)&in;
 	}
 
+
 WAYLIB_END_NAMESPACE

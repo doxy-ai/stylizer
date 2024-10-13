@@ -62,7 +62,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		wl::result<wl::window*> present(wgpu_state& state, wl::releasable auto... releases) WAYLIB_TRY {
+		result<window*> present(wgpu_state& state, releasable auto... releases) WAYLIB_TRY {
 		#ifndef __EMSCRIPTEN__
 			surface.present();
 		#endif
@@ -70,10 +70,13 @@ WAYLIB_BEGIN_NAMESPACE
 			return this;
 		} WAYLIB_CATCH
 
-		wl::result<wl::window*> present(wgpu_state& state, wl::texture& texture, wl::releasable auto... releases) {
+		result<window*> present(wgpu_state& state, texture& texture, releasable auto... releases) {
 			auto oldSurface = state.surface; state.surface = this->surface;
-			auto surfaceTexture = state.current_surface_texture(); if(!surfaceTexture) return wl::unexpected(surfaceTexture.error());
-			auto blit = texture.blit_to(state, *surfaceTexture); if(!blit) return wl::unexpected(blit.error());
+			auto surfaceTexture = state.current_surface_texture(); if(!surfaceTexture) return unexpected(surfaceTexture.error());
+			result<drawing_state> blit = drawing_state{};
+			if(surfaceTexture->size() == texture.size()) {
+				if(auto res = surfaceTexture->copy(state, texture); !res) return unexpected(res.error());
+			} else if(blit = texture.blit_to(state, *surfaceTexture); !blit) return unexpected(blit.error());
 			state.surface = oldSurface;
 			return present(state, releases..., *blit, *surfaceTexture);
 		}
