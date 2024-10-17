@@ -18,25 +18,34 @@ int main() {
 #define WAYLIB_CAMERA_DATA_IS_3D
 #include <waylib/default_gbuffer>
 
+@group(2) @binding(0) var texture: texture_2d<f32>;
+@group(2) @binding(1) var textureSampler: sampler;
+
 @vertex
-fn vertex(in: vertex_input, @builtin(vertex_index) in_vertex_index: u32) -> vertex_output {
-	if false { ensure_pipeline_layout(); }
-	return unpack_input(in);
+fn vertex(in: vertex_input, @builtin(vertex_index) vertex_index: u32, @builtin(instance_index) instance_index: u32) -> vertex_output {
+	if false { ensure_gbuffer_layout(); }
+	return unpack_vertex_input_full(in, instances[instance_index].transform, camera_view_projection_matrix(utility.camera));
 }
 
 @fragment
 fn fragment(vert: vertex_output) -> fragment_output {
 	return fragment_output(
-		vec4f(vert.color.rgb, 1.0),
+		textureSample(texture, textureSampler, vert.uv),
 		vec4f(vert.normal, 1.0),
 	);
 }
 	)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment", .preprocessor = &p}).throw_if_error();
 
-	wl::auto_release model = wl::obj::load("../resources/tri.obj").throw_if_error();
+	wl::auto_release texture = std::move(*wl::img::load("../resources/test.hdr").throw_if_error()
+		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear}).throw_if_error()
+		.generate_mipmaps(state).throw_if_error());
+
+	wl::auto_release model = wl::obj::load("../resources/suzane_highpoly.obj").throw_if_error();
 	model.meshes()[0].indices = nullptr;
 	model.upload(state, gbuffer).throw_if_error();
 	wl::auto_release material = wl::material(wl::materialC{
+		.texture_count = 1,
+		.textures = &texture,
 		.shaders = &shader,
 		.shader_count = 1
 	});
@@ -44,28 +53,27 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	model.material_count = 1;
 	model.c().materials = &material;
 	model.c().mesh_materials = nullptr;
-
-	wl::auto_release texture = std::move(*wl::img::load("../resources/test.hdr").throw_if_error()
-		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear}).throw_if_error()
-		.generate_mipmaps(state).throw_if_error());
+	model.transform = glm::identity<glm::mat4x4>();
 
 	wl::auto_release<wl::gpu_buffer> utility_buffer;
 	wl::time time{};
-	wl::camera3D camera = wl::camera3DC{.position = {1, 2, 3}, .target_position = wl::vec3f(0), .up = {0, 1, 0}};
+	wl::camera3D camera = wl::camera3DC{.position = {0, 1, -1}, .target_position = wl::vec3f(0)};
 
-	// WAYLIB_MAIN_LOOP(!window.should_close(),
-	while(!window.should_close()) {
+	WAYLIB_MAIN_LOOP(!window.should_close(),
+	// while(!window.should_close()) {
 		utility_buffer = time.calculate().update_utility_buffer(state, utility_buffer).throw_if_error();
+
+		camera.position = wl::vec3f(2 * cos(time.since_start), sin(time.since_start / 4), 2 * sin(time.since_start));
 		utility_buffer = camera.calculate_matricies(window.get_size()).update_utility_buffer(state, utility_buffer).throw_if_error();
 
 		wl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}, utility_buffer).throw_if_error();
 		{
-			model.draw_instanced(draw, {}).throw_if_error();
+			model.draw(draw).throw_if_error();
 		}
 		draw.draw().throw_if_error();
 
 		// Present gbuffer's color
 		window.present(state, gbuffer.color()).throw_if_error();
-	}
-	// );
+	// }
+	);
 }

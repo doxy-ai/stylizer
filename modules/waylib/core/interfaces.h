@@ -223,7 +223,8 @@ typedef struct gpu_bufferC {
 } WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC);
 
 // Gbuffer
-typedef struct {
+typedef struct WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC) {
+	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) previous;
 	WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC) color, depth, normal;
 } WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC);
 
@@ -258,9 +259,15 @@ typedef struct {
 
 // Material
 typedef struct {
+	index_t buffer_count;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
+	index_t texture_count;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)*)) textures;
+
 	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC)*) shaders;
 	WAYLIB_PREFIXED(index_t) shader_count;
 	WAYLIB_C_OR_CPP_TYPE(WGPURenderPipeline, wgpu::RenderPipeline) pipeline;
+	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUBindGroup, wgpu::BindGroup)) bind_group;
 } WAYLIB_PREFIXED_C_CPP_TYPE(material, materialC);
 
 // Mesh, vertex data
@@ -355,13 +362,19 @@ typedef struct {
 	float _pad0;
 	WAYLIB_PREFIXED(vec3f) target_position; // at byte offset 144
 	float _pad1;
-	WAYLIB_PREFIXED(vec3f) up; // at byte offset 160
-	float field_of_view // at byte offset 172
+	WAYLIB_PREFIXED(vec3f) up // at byte offset 160
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= {0, 1, 0}
+#endif
+	; float field_of_view // at byte offset 172
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= 90
 #endif
-	; float near_clip_distance; // at byte offset 176
-	float far_clip_distance // at byte offset 180
+	; float near_clip_distance // at byte offset 176
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= .01
+#endif
+	; float far_clip_distance // at byte offset 180
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= 1000
 #endif
@@ -376,8 +389,11 @@ typedef struct {
 	float _pad0;
 	WAYLIB_PREFIXED(vec3f) target_position; // at byte offset 144
 	float rotation; // at byte offset 156
-	float near_clip_distance; // at byte offset 160
-	float far_clip_distance // at byte offset 164
+	float near_clip_distance // at byte offset 160
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= .01
+#endif
+	; float far_clip_distance // at byte offset 164
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= 10
 #endif
@@ -480,7 +496,11 @@ typedef struct {
 } WAYLIB_PREFIXED(texture_create_configuation);
 
 typedef struct {
-	WGPUTextureFormat color_format
+	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) previous
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= nullptr
+#endif
+	; WGPUTextureFormat color_format
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureFormat::RGBA8Unorm
 #endif

@@ -433,7 +433,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 		template<typename T = std::byte>
 		result<gpu_buffer*> write(wgpu_state& state, std::span<T> data, size_t offset = 0) WAYLIB_TRY {
-			assert(data.size() * sizeof(T) + offset < this->offset + size);
+			assert(data.size() * sizeof(T) + offset <= this->offset + size);
 			state.device.getQueue().writeBuffer(gpu_data, this->offset + offset, data.data(), data.size() * sizeof(T));
 			return this;
 		} WAYLIB_CATCH
@@ -526,7 +526,7 @@ WAYLIB_BEGIN_NAMESPACE
 		result<gpu_buffer*> copy_to_texture_record_existing(WGPUCommandEncoder encoder, texture& target, size_t mip_level = 0) WAYLIB_TRY {
 			assert(mip_level <= target.mip_levels);
 			auto size = target.size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
-			
+
 			wgpu::ImageCopyBuffer source = wgpu::Default;
 			source.buffer = gpu_data;
 			source.layout.bytesPerRow = texture::bytes_per_pixel(target.format()) * size.x;
@@ -585,6 +585,14 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
+	template<typename Tgbuffer>
+	concept GbufferProvider = requires(Tgbuffer gbuffer, struct drawing_state draw, struct material mat) {
+		{gbuffer.targets()} -> std::convertible_to<std::span<const WGPUColorTargetState>>; // TODO: Why is std::array not convertible to std::span?
+		{gbuffer.buffers()} -> std::convertible_to<std::span<const gpu_buffer>>;
+		{gbuffer.textures()} -> std::convertible_to<std::span<const texture>>;
+		{gbuffer.bind_group(draw, mat)} -> std::convertible_to<result<wgpu::BindGroup>>;
+	};
+
 	struct Gbuffer: public GbufferC {
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(Gbuffer)
 		Gbuffer(Gbuffer&& other) { *this = std::move(other); }
@@ -615,6 +623,7 @@ WAYLIB_BEGIN_NAMESPACE
 				{.format = config.normal_format, .usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc, .sampler_type = texture_create_sampler_type::None}
 			); if(!res) return unexpected(res.error());
 			out.normal() = *res;
+			out.previous = config.previous;
 			return out;
 		} WAYLIB_CATCH
 
@@ -630,6 +639,9 @@ WAYLIB_BEGIN_NAMESPACE
 				normal().default_color_target_state(),
 			};
 		}
+
+		std::span<const gpu_buffer> buffers() { return {(gpu_buffer*)nullptr, 0}; }
+		std::span<const texture> textures() { return {&color(), 3}; }
 
 		result<wgpu::BindGroup> bind_group(struct drawing_state& draw, struct material& mat);
 
@@ -876,48 +888,37 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 
 		result<recording_state> dispatch_record_existing(wgpu_state& state, WGPUCommandEncoder encoder, vec3u workgroups, WAYLIB_OPTIONAL(WGPUComputePassEncoder) existing_pass = {}, bool end_pass = true) WAYLIB_TRY {
-			wgpu::BindGroup bufferBindGroup = nullptr, textureBindGroup = nullptr;
-			std::vector<wgpu::BindGroupEntry> bufferEntries, textureEntries;
+			std::vector<wgpu::BindGroupEntry> entries(buffer_count + texture_count, wgpu::Default);
 
 			if(buffer_count) {
-				bufferEntries = std::vector<wgpu::BindGroupEntry>(buffer_count, wgpu::Default); // TODO: Why does std::vector except?
 				for(size_t i = 0; i < buffer_count; ++i) {
-					bufferEntries[i].binding = i;
-					bufferEntries[i].buffer = buffers()[i].gpu_data;
-					bufferEntries[i].offset = buffers()[i].offset;
-					bufferEntries[i].size = buffers()[i].size;
+					entries[i].binding = i;
+					entries[i].buffer = buffers()[i].gpu_data;
+					entries[i].offset = buffers()[i].offset;
+					entries[i].size = buffers()[i].size;
 				}
-				bufferBindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
-					.label = "Waylib Compute Buffer Bind Group",
-					.layout = pipeline.getBindGroupLayout(0),
-					.entryCount = bufferEntries.size(),
-					.entries = bufferEntries.data()
-				});
 			}
-
 			if(texture_count) {
-				textureEntries = std::vector<wgpu::BindGroupEntry>(texture_count /* * 2*/, wgpu::Default);
 				for(size_t i = 0; i < texture_count; ++i) {
-					textureEntries[i].binding = i;
-					textureEntries[i].textureView = textures()[i].view;
+					entries[i + buffer_count].binding = i;
+					entries[i + buffer_count].textureView = textures()[i].view;
 				}
-				textureBindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
-					.label = "Waylib Compute Texture Bind Group",
-					.layout = pipeline.getBindGroupLayout(buffer_count > 0),
-					.entryCount = textureEntries.size(),
-					.entries = textureEntries.data()
-				});
 			}
+			auto bindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
+				.label = "Waylib Compute Resources Bind Group",
+				.layout = pipeline.getBindGroupLayout(0),
+				.entryCount = entries.size(),
+				.entries = entries.data()
+			});
 
 			wgpu::ComputePassEncoder pass = existing_pass ? static_cast<wgpu::ComputePassEncoder>(*existing_pass) : static_cast<wgpu::CommandEncoder>(encoder).beginComputePass();
 			{
 				pass.setPipeline(pipeline);
-				if(bufferBindGroup) pass.setBindGroup(0, bufferBindGroup, 0, nullptr);
-				if(textureBindGroup) pass.setBindGroup(buffer_count > 0, textureBindGroup, 0, nullptr);
+				pass.setBindGroup(0, bindGroup, 0, nullptr);
 				pass.dispatchWorkgroups(workgroups.x, workgroups.y, workgroups.z);
 			}
 			if(end_pass) pass.end();
-			return recording_state{pass, bufferBindGroup, textureBindGroup};
+			return recording_state{pass, bindGroup};
 		} WAYLIB_CATCH
 
 		result<computer*> dispatch(wgpu_state& state, vec3u workgroups) WAYLIB_TRY {
@@ -970,13 +971,53 @@ WAYLIB_BEGIN_NAMESPACE
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(material)
 		material(material&& other) { *this = std::move(other); }
 		material& operator=(material&& other) {
+			buffer_count = std::exchange(other.buffer_count, 0);
+			c().buffers = std::exchange(other.c().buffers, nullptr);
+			texture_count = std::exchange(other.texture_count, 0);
+			c().textures = std::exchange(other.c().textures, nullptr);
 			shader_count = std::exchange(other.shader_count, 0);
-			shaders = std::exchange(other.shaders, nullptr);
+			c().shaders = std::exchange(other.c().shaders, nullptr);
 			pipeline = std::exchange(other.pipeline, nullptr);
+			bind_group = std::exchange(other.bind_group, nullptr);
 			return *this;
 		}
-		std::span<shader> shaders_span() { return {static_cast<shader*>(shaders.value), shader_count}; }
+		std::span<gpu_buffer> buffers() { return {static_cast<gpu_buffer*>(c().buffers.value), buffer_count}; }
+		std::span<texture> textures() { return {static_cast<texture*>(c().textures.value), texture_count}; }
+		std::span<shader> shaders() { return {static_cast<shader*>(c().shaders.value), shader_count}; }
 		operator bool() { return pipeline; }
+
+		result<material*> rebind_bind_group(wgpu_state& state) WAYLIB_TRY {
+			std::vector<WGPUBindGroupEntry> entries;
+			uint32_t binding = 0;
+			for(auto& buffer: buffers())
+				entries.emplace_back(WGPUBindGroupEntry{
+					.binding = binding++,
+					.buffer = buffer.gpu_data,
+					.offset = buffer.offset,
+					.size = buffer.size,
+				});
+			for(auto& texture: textures()) {
+				entries.emplace_back(WGPUBindGroupEntry{
+					.binding = binding++,
+					.textureView = texture.view
+				});
+				wgpu::Sampler sampler = texture.sampler ? texture.sampler : texture::default_sampler(state);
+				entries.emplace_back(WGPUBindGroupEntry{ // TODO: Failing?
+					.binding = binding++,
+					.sampler = sampler
+				});
+			}
+
+			assert(buffer_count + texture_count);
+			if(bind_group) bind_group.release();
+			bind_group = state.device.createBindGroup(WGPUBindGroupDescriptor {
+				.label = "Waylib Shader Data Bind Group",
+				.layout = pipeline.getBindGroupLayout(2),
+				.entryCount = entries.size(),
+				.entries = entries.data()
+			});
+			return this;
+		} WAYLIB_CATCH
 
 		// TODO: This function needs to become gbuffer aware
 		result<material*> upload(
@@ -989,7 +1030,7 @@ WAYLIB_BEGIN_NAMESPACE
 			wgpu::RenderPipelineDescriptor pipelineDesc;
 			wgpu::FragmentState fragment;
 			for(size_t i = shader_count; i--; ) { // Reverse iteration ensures that lower indexed shaders take precedence
-				shader& shader = *static_cast<struct shader*>(*shaders + i);
+				shader& shader = shaders()[i];
 				WAYLIB_OPTIONAL(wgpu::FragmentState) fragmentOpt;
 				std::tie(pipelineDesc, fragmentOpt) = shader.configure_render_pipeline_descriptor(state, gbuffer_targets, mesh_layout, pipelineDesc);
 				if(fragmentOpt.has_value) {
@@ -1043,6 +1084,9 @@ WAYLIB_BEGIN_NAMESPACE
 
 			if(pipeline) pipeline.release();
 			pipeline = state.device.createRenderPipeline(pipelineDesc);
+
+			if(texture_count + buffer_count > 0)
+				if(auto res = rebind_bind_group(state); !res) return unexpected(res.error());
 			return this;
 		}
 		template<GbufferTargetProvider Tgbuffer>
@@ -1057,9 +1101,10 @@ WAYLIB_BEGIN_NAMESPACE
 
 		void release(bool release_shaders = true) {
 			if(release_shaders) for(size_t i = 0; i < shader_count; ++i)
-				static_cast<shader&>(shaders[i]).release();
-			if(shaders) delete [] std::exchange(shaders, {}).value;
+				shaders()[i].release();
+			if(c().shaders) delete [] std::exchange(c().shaders, {}).value;
 			if(pipeline) std::exchange(pipeline, nullptr).release();
+			if(bind_group) std::exchange(bind_group, nullptr).release();
 		}
 	};
 
@@ -1365,6 +1410,9 @@ WAYLIB_BEGIN_NAMESPACE
 				draw.render_pass.setBindGroup(0, *drawTimeBindGroup, 0, nullptr);
 				draw.defer([group = *drawTimeBindGroup]{ const_cast<wgpu::BindGroup&>(group).release(); });
 
+				if(mat.bind_group)
+					draw.render_pass.setBindGroup(2, mat.bind_group, 0, nullptr);
+
 				bindings[0].buffer = mesh.vertex_buffer;
 				bindings[0].size = metadata.vertex_buffer_size;
 				bindings[1].buffer = metadata.is_indexed ? mesh.index_buffer : zeroBuffer->gpu_data;
@@ -1404,6 +1452,14 @@ WAYLIB_BEGIN_NAMESPACE
 			}
 			return this;
 		} WAYLIB_CATCH
+
+		result<model*> draw(drawing_state& draw) {
+			model_instance instance{
+				.transform = transform,
+				.tint = {}
+			};
+			return draw_instanced(draw, {&instance, 1});
+		}
 	};
 
 

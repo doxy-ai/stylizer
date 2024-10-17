@@ -589,7 +589,7 @@ fn computeMipMap(@builtin(global_invocation_id) id: vec3<u32>) {
 	}
 
 	if(view) newTexture->create_view();
-	if(sampler) newTexture->sampler = sampler;
+	if(sampler) newTexture->sampler = std::exchange(sampler, nullptr);
 
 	release();
 	(*this) = std::move(*newTexture);

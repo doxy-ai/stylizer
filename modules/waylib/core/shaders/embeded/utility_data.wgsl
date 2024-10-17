@@ -55,10 +55,18 @@ struct light_data {
 		camera: camera3D_data,
 		lights: array<light_data>,
 	}
+
+	fn camera_view_projection_matrix(camera: camera3D_data) -> mat4x4f {
+		return camera.projection_matrix * camera.view_matrix;
+	}
 #else
 	struct utility_data {
 		time: frame_time_data,
 		camera: camera2D_data,
 		lights: array<light_data>,
+	}
+
+	fn camera_view_projection_matrix(camera: camera2D_data) -> mat4x4f {
+		return camera.projection_matrix * camera.view_matrix;
 	}
 #endif

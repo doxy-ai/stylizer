@@ -35,15 +35,15 @@ struct vertex_output {
 	@location(13) bone_weights: vec4f,
 }
 
-fn unpack_input(in: vertex_input) -> vertex_output {
+fn unpack_vertex_input(in: vertex_input) -> vertex_output {
 	return vertex_output(
-		vec4(in.position.xyz, 1), // builtin_position
+		vec4f(in.position.xyz, 1), // builtin_position
 		in.position.xyz, // position
 		in.position.w, // mask1
 		in.normal.xyz, // normal
 		in.normal.w, // mask2
 		in.tangent.xyz, // tangent
-		vec3(in.tangent.w), // bitangent
+		vec3f(in.tangent.w), // bitangent
 		in.uv.xy, // uv
 		in.uv.zw, // uv2
 		in.cta.x, // curvature
@@ -55,12 +55,12 @@ fn unpack_input(in: vertex_input) -> vertex_output {
 	);
 }
 
-fn vertex_output_apply_model_matrixview_projection_matrix(in: vertex_output, model_matrix: mat4x4f, view_projection_matrix: mat4x4f) -> vertex_output {
+fn vertex_output_apply_model_view_projection_matrix(in: vertex_output, model_matrix: mat4x4f, view_projection_matrix: mat4x4f) -> vertex_output {
 	var out = in;
-	let position = model_matrix * in.builtin_position;
-	out.builtin_position = view_projection_matrix * position;
-	out.position = position.xyz;
-	out.normal = normalize(model_matrix * vec4(in.normal, 0)).xyz;
+	let world_position = model_matrix * in.builtin_position;
+	out.builtin_position = view_projection_matrix * world_position;
+	out.position = world_position.xyz;
+	out.normal = normalize(model_matrix * vec4f(in.normal, 0)).xyz;
 	return out;
 }
 
@@ -70,8 +70,10 @@ fn vertex_output_generate_bitangent(in: vertex_output) -> vertex_output {
 	return out;
 }
 
-fn unpack_input_full(in: vertex_input, model_matrix: mat4x4f, view_projection_matrix: mat4x4f) -> vertex_output {
-	return vertex_output_generate_bitangent(vertex_output_apply_model_matrixview_projection_matrix(unpack_input(in), model_matrix, view_projection_matrix));
+fn unpack_vertex_input_full(in: vertex_input, model_matrix: mat4x4f, view_projection_matrix: mat4x4f) -> vertex_output {
+	return vertex_output_generate_bitangent(
+		vertex_output_apply_model_view_projection_matrix(unpack_vertex_input(in), model_matrix, view_projection_matrix)
+	);
 }
 
 fn normal_mapping(in: vertex_output, tangent_space_normal: vec3f) -> vec3f {
