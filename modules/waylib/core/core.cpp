@@ -1,4 +1,3 @@
-#include "webgpu/webgpu.h"
 #define TCPP_IMPLEMENTATION
 #define WEBGPU_CPP_IMPLEMENTATION
 #define IS_WAYLIB_CORE_CPP
@@ -76,12 +75,12 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 
 	WGPUFeatureName float32filterable = WGPUFeatureName_Float32Filterable;
 	wgpu::Device device = adapter.requestDevice(WGPUDeviceDescriptor{
-		.label = "Waylib Device",
+		.label = toWGPU("Waylib Device"),
 		.requiredFeatureCount = 1,
 		.requiredFeatures = &float32filterable,
 		.requiredLimits = nullptr,
 		.defaultQueue = {
-			.label = "Waylib Queue"
+			.label = toWGPU("Waylib Queue")
 		},
 #ifdef __EMSCRIPTEN__
 		.deviceLostCallback = [](WGPUDeviceLostReason reason, char const* message, void* userdata) {
@@ -97,10 +96,10 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 #else // __EMSCRIPTEN__
 		.deviceLostCallbackInfo = {
 			.mode = wgpu::CallbackMode::AllowSpontaneous,
-			.callback = [](WGPUDevice const* device, WGPUDeviceLostReason reason, char const* message, void* userdata) {
+			.callback = [](WGPUDevice const* device, WGPUDeviceLostReason reason, WGPUStringView message, void* userdata) {
 				std::stringstream s;
 				s << "Device " << wgpu::Device{*device} << " lost: reason " << wgpu::DeviceLostReason{reason};
-				if (message) s << " (" << message << ")";
+				if (message.length) s << " (" << std::string_view{message.data, message.length} << ")";
 #ifdef __cpp_exceptions
 				throw exception(s.str());
 #else // __cpp_exceptions
@@ -109,10 +108,10 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 			}
 		},
 		.uncapturedErrorCallbackInfo = {
-			.callback = [](WGPUErrorType type, char const* message, void* userdata) {
+			.callback = [](WGPUErrorType type, WGPUStringView message, void* userdata) {
 				std::stringstream s;
 				s << "Uncaptured device error: type " << wgpu::ErrorType{type};
-				if (message) s << " (" << message << ")";
+				if (message.length) s << " (" << std::string_view{message.data, message.length} << ")";
 #ifdef __cpp_exceptions
 				throw exception(s.str());
 #else // __cpp_exceptions
@@ -541,7 +540,7 @@ result<texture*> texture::generate_mipmaps(wgpu_state& state, uint32_t max_level
 @group(0) @binding(1) var nextMipLevel: texture_storage_2d<)_" + formatStr + R"_(, write>;
 
 @compute @workgroup_size(8, 8)
-fn computeMipMap(@builtin(global_invocation_id) id: vec3<u32>) {
+fn compute(@builtin(global_invocation_id) id: vec3<u32>) {
     let offset = vec2<u32>(0, 1);
     let color = (
         textureLoad(previousMipLevel, 2 * id.xy + offset.xx, 0) +
@@ -550,7 +549,7 @@ fn computeMipMap(@builtin(global_invocation_id) id: vec3<u32>) {
         textureLoad(previousMipLevel, 2 * id.xy + offset.yy, 0)
     ) * 0.25;
     textureStore(nextMipLevel, id.xy, color);
-})_");
+})_", {.compute_entry_point = "compute"});
 	if(!tmpMipShader) return unexpected(tmpMipShader.error());
 	wl::auto_release mipShader = std::move(*tmpMipShader);
 
@@ -622,9 +621,9 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	// Create a command encoder for the draw call
 	wgpu::CommandEncoderDescriptor encoderDesc = {};
-	encoderDesc.label = "Waylib Render Command Encoder";
+	encoderDesc.label = toWGPU("Waylib Render Command Encoder");
 	out.render_encoder = state.device.createCommandEncoder(encoderDesc);
-	encoderDesc.label = "Waylib Command Encoder";
+	encoderDesc.label = toWGPU("Waylib Command Encoder");
 	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
 
 	static texture depthTexture = {};
@@ -794,7 +793,7 @@ result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct m
 		entries[0].size = draw.utility_buffer->size;
 	}
 	return draw.state().device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
-		.label = "Waylib Compute Texture Bind Group",
+		.label = toWGPU("Waylib Compute Texture Bind Group"),
 		.layout = mat.pipeline.getBindGroupLayout(0),
 		.entryCount = entries.size(),
 		.entries = entries.data()
@@ -807,9 +806,9 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	// Create a command encoder for the draw call
 	wgpu::CommandEncoderDescriptor encoderDesc = {};
-	encoderDesc.label = "Waylib Render Command Encoder";
+	encoderDesc.label = toWGPU("Waylib Render Command Encoder");
 	out.render_encoder = state.device.createCommandEncoder(encoderDesc);
-	encoderDesc.label = "Waylib Command Encoder";
+	encoderDesc.label = toWGPU("Waylib Command Encoder");
 	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
 
 
@@ -918,7 +917,7 @@ std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> 
 		pipelineDesc.vertex.buffers = bufferLayouts.data();
 		pipelineDesc.vertex.constantCount = 0;
 		pipelineDesc.vertex.constants = nullptr;
-		pipelineDesc.vertex.entryPoint = *vertex_entry_point;
+		pipelineDesc.vertex.entryPoint = toWGPU(*vertex_entry_point);
 		pipelineDesc.vertex.module = module;
 	}
 
@@ -926,7 +925,7 @@ std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> 
 		static wgpu::FragmentState fragment;
 		fragment.constantCount = 0;
 		fragment.constants = nullptr;
-		fragment.entryPoint = *fragment_entry_point;
+		fragment.entryPoint = toWGPU(*fragment_entry_point);
 		fragment.module = module;
 		fragment.targetCount = gbuffer_targets.size();
 		fragment.targets = gbuffer_targets.data();

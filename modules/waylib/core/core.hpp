@@ -5,6 +5,7 @@
 
 #include "utility.hpp"
 #include "waylib/core/optional.h"
+#include "webgpu/webgpu.h"
 #include "wgsl_types.hpp"
 #include "shader_preprocessor.hpp"
 
@@ -29,6 +30,9 @@ WAYLIB_BEGIN_NAMESPACE
 
 
 	static constexpr size_t minimum_utility_buffer_size = 304;
+
+
+	inline constexpr WGPUStringView toWGPU(std::string_view view) { return WGPUStringView{view.data(), view.size()}; }
 
 
 //////////////////////////////////////////////////////////////////////
@@ -104,10 +108,10 @@ WAYLIB_BEGIN_NAMESPACE
 			device.getQueue().release();
 #ifndef __EMSCRIPTEN__
 			// We expect the device to be lost when it is released... so don't do anything to stop it
-			auto callback = device.setDeviceLostCallback([](WGPUDeviceLostReason reason, char const* message) {});
+			auto callback = device.setDeviceLostCallback([](wgpu::DeviceLostReason reason, wgpu::StringView message) {});
 #endif
-			std::exchange(device, nullptr).release();
 			if(surface) std::exchange(surface, nullptr).release();
+			std::exchange(device, nullptr).release();
 			if(adapter_release) std::exchange(adapter, nullptr).release();
 			if(instance_release) std::exchange(instance, nullptr).release();
 		}
@@ -256,7 +260,7 @@ WAYLIB_BEGIN_NAMESPACE
 			out.mip_levels = config.mip_levels;
 			auto format = config.format ? *config.format : wgpu::TextureFormat::RGBA8UnormSrgb;
 			out.gpu_data = state.device.createTexture(WGPUTextureDescriptor {
-				.label = "Waylib Color Buffer",
+				.label = toWGPU("Waylib Color Buffer"),
 				.usage = config.usage,
 				.dimension = config.dimension,
 				.size = {size.x, size.y, size.z},
@@ -375,7 +379,7 @@ WAYLIB_BEGIN_NAMESPACE
 		result<gpu_buffer*> upload(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, bool mapped_at_creation = false) WAYLIB_TRY {
 			if(gpu_data == nullptr) {
 				gpu_data = state.device.createBuffer(WGPUBufferDescriptor {
-					.label = label ? *label : "Generic Waylib Buffer",
+					.label = toWGPU(label ? *label : "Generic Waylib Buffer"),
 					.usage = usage,
 					.size = offset + size,
 					.mappedAtCreation = mapped_at_creation,
@@ -449,9 +453,9 @@ WAYLIB_BEGIN_NAMESPACE
 #else
 				auto future = const_cast<wgpu::Buffer*>(&gpu_data)->mapAsync2(mode, offset, size, WGPUBufferMapCallbackInfo2{
 					.mode = wgpu::CallbackMode::AllowSpontaneous,
-					.callback = closure2function_pointer([&done](wgpu::MapAsyncStatus status, char const * message, void* userdata1, void* userdata2) {
+					.callback = closure2function_pointer([&done](wgpu::MapAsyncStatus status, wgpu::StringView message, void* userdata1, void* userdata2) {
 						done = true;
-					}, WGPUMapAsyncStatus{}, (const char*)nullptr, (void*)nullptr, (void*)nullptr)
+					}, WGPUMapAsyncStatus{}, WGPUStringView{}, (void*)nullptr, (void*)nullptr)
 				});
 #endif
 				while(!done) state.instance.processEvents();
@@ -702,9 +706,9 @@ WAYLIB_BEGIN_NAMESPACE
 			render_pass.end();
 
 			wgpu::CommandBufferDescriptor cmdBufferDescriptor = {};
-			cmdBufferDescriptor.label = "Waylib Pre Frame Command Buffer";
+			cmdBufferDescriptor.label = toWGPU("Waylib Pre Frame Command Buffer");
 			wgpu::CommandBuffer commands = pre_encoder.finish(cmdBufferDescriptor);
-			cmdBufferDescriptor.label = "Waylib Frame Render Command Buffer";
+			cmdBufferDescriptor.label = toWGPU("Waylib Frame Render Command Buffer");
 			wgpu::CommandBuffer render_commands = render_encoder.finish(cmdBufferDescriptor);
 			pre_encoder.release(); pre_encoder = nullptr;
 			render_encoder.release(); render_encoder = nullptr;
@@ -783,7 +787,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 		static result<shader> from_wgsl(wgpu_state& state, std::string_view wgsl_source_code, create_shader_configuration config = {}) WAYLIB_TRY {
 			wgpu::ShaderModuleDescriptor shaderDesc;
-			shaderDesc.label = config.name;
+			shaderDesc.label = config.name ? toWGPU(config.name) : WGPUStringView{};
 
 			// We use the extension mechanism to specify the WGSL part of the shader module descriptor
 #ifdef __EMSCRIPTEN__
@@ -806,8 +810,8 @@ WAYLIB_BEGIN_NAMESPACE
 				if(!res) return unexpected(res.error());
 
 				static std::string keepAlive; keepAlive = *res;
-				shaderCodeSource.code = keepAlive.c_str();
-			} else shaderCodeSource.code = cstring_from_view(wgsl_source_code);
+				shaderCodeSource.code = toWGPU(keepAlive);
+			} else shaderCodeSource.code = toWGPU(wgsl_source_code);
 
 			return {shaderC{
 				.compute_entry_point = config.compute_entry_point,
@@ -868,9 +872,9 @@ WAYLIB_BEGIN_NAMESPACE
 
 		result<computer*> upload(wgpu_state& state, WAYLIB_OPTIONAL(std::string_view) label = {}) WAYLIB_TRY {
 			wgpu::ComputePipelineDescriptor computePipelineDesc = wgpu::Default;
-			computePipelineDesc.label = label ? cstring_from_view(*label) : "Waylib Compute Pipeline";
+			computePipelineDesc.label = label ? toWGPU(*label) : toWGPU("Waylib Compute Pipeline");
 			computePipelineDesc.compute.module = shader().module;
-			computePipelineDesc.compute.entryPoint = *shader().compute_entry_point;
+			computePipelineDesc.compute.entryPoint = toWGPU(*shader().compute_entry_point);
 
 			if(pipeline) pipeline.release();
 			pipeline = state.device.createComputePipeline(computePipelineDesc);
@@ -905,7 +909,7 @@ WAYLIB_BEGIN_NAMESPACE
 				}
 			}
 			auto bindGroup = state.device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
-				.label = "Waylib Compute Resources Bind Group",
+				.label = toWGPU("Waylib Compute Resources Bind Group"),
 				.layout = pipeline.getBindGroupLayout(0),
 				.entryCount = entries.size(),
 				.entries = entries.data()
@@ -1011,7 +1015,7 @@ WAYLIB_BEGIN_NAMESPACE
 			assert(buffer_count + texture_count);
 			if(bind_group) bind_group.release();
 			bind_group = state.device.createBindGroup(WGPUBindGroupDescriptor {
-				.label = "Waylib Shader Data Bind Group",
+				.label = toWGPU("Waylib Shader Data Bind Group"),
 				.layout = pipeline.getBindGroupLayout(2),
 				.entryCount = entries.size(),
 				.entries = entries.data()
@@ -1419,7 +1423,7 @@ WAYLIB_BEGIN_NAMESPACE
 				bindings[1].size = index_size;
 
 				auto perMeshBindGroup = draw.state().device.createBindGroup(WGPUBindGroupDescriptor {
-					.label = "Waylib Mesh Data Bind Group",
+					.label = toWGPU("Waylib Mesh Data Bind Group"),
 					.layout = mat.pipeline.getBindGroupLayout(1),
 					.entryCount = bindings.size(),
 					.entries = bindings.data()

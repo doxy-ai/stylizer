@@ -1,6 +1,7 @@
 #ifndef WAYLIB_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
 #define WAYLIB_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
 
+#include "waylib/core/optional.h"
 #ifndef __cplusplus
 	#include "config.h"
 	#include "optional.h"
@@ -536,23 +537,26 @@ typedef struct {
 } WAYLIB_PREFIXED(preprocess_shader_config);
 
 typedef struct {
-	const char* compute_entry_point
+	WAYLIB_NULLABLE(const char*) compute_entry_point
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; const char* vertex_entry_point
+	; WAYLIB_NULLABLE(const char*) vertex_entry_point
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; const char* fragment_entry_point
+	; WAYLIB_NULLABLE(const char*) fragment_entry_point
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; const char* name
+	; WAYLIB_NULLABLE(const char*) name
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; shader_preprocessor* preprocessor
+	; WAYLIB_NULLABLE(shader_preprocessor*) preprocessor
+#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		= nullptr
+#endif
 	; preprocess_shader_config preprocess_config
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= {}

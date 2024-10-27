@@ -168,7 +168,7 @@ namespace wgsl_preprocess {
 		}
 
 		shader_preprocessor& initialize_platform_defines(WGPUAdapter adapter) {
-			constexpr static auto quote = [](const std::string& s) { return "\"" + s + "\""; };
+			constexpr static auto quote = [](WGPUStringView view) { return "\"" + std::string(std::string_view(view.data, view.length)) + "\""; };
 
 			wgpu::AdapterInfo info;
 			static_cast<wgpu::Adapter>(adapter).getInfo(&info);
