@@ -34,7 +34,8 @@ WAYLIB_BEGIN_NAMESPACE
 		type() {}\
 		type(const type&) = default;\
 		type& operator=(const type&) = default;\
-		type(type ## C&& c) : type ## C(std::move(c)) {}
+		type(type ## C&& c) : type ## C(std::move(c)) {}\
+		type& zero() { std::memset(this, 0, sizeof(type)); return *this; }
 
 
 //////////////////////////////////////////////////////////////////////

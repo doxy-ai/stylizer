@@ -771,12 +771,31 @@ result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, t
 
 
 //////////////////////////////////////////////////////////////////////
+// # GPU Buffer (Generic)
+//////////////////////////////////////////////////////////////////////
+
+
+result<gpu_buffer> gpu_buffer::zero_buffer(wgpu_state& state, size_t minimum_size /* = 0 */, drawing_state* draw /* = nullptr */) {
+	static result<gpu_buffer> zeroBuffer = gpu_bufferC{};
+
+	if(!*zeroBuffer || minimum_size > zeroBuffer->size) {
+		zeroBuffer->size = minimum_size + minimum_size % 4;
+		std::vector<std::byte> zeroData(zeroBuffer->size, std::byte{0});
+		if(*zeroBuffer && !draw) zeroBuffer->release();
+		else if(*zeroBuffer) draw->defer([gpu_data = zeroBuffer->gpu_data] { const_cast<wgpu::Buffer&>(gpu_data).release(); });
+		zeroBuffer = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage | wgpu::BufferUsage::Uniform | wgpu::BufferUsage::Vertex, {"Waylib Zero Buffer"});
+	}
+	return zeroBuffer;
+}
+
+
+//////////////////////////////////////////////////////////////////////
 // # Gbuffer
 //////////////////////////////////////////////////////////////////////
 
 
 result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
-	auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), minimum_utility_buffer_size);
+	auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), minimum_utility_buffer_size, &draw);
 	if(!zeroBuffer) return unexpected(zeroBuffer.error());
 
 	std::array<WGPUBindGroupEntry, 1> entries = {
@@ -872,6 +891,7 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 
 shader_preprocessor& shader_preprocessor::initialize_virtual_filesystem(const config &config /* = {} */) {
+	process_from_memory_and_cache(b::embed<"shaders/embeded/inverse.wgsl">().str(), "waylib/inverse", config);
 	process_from_memory_and_cache(b::embed<"shaders/embeded/mesh_data.wgsl">().str(), "waylib/mesh_data", config);
 	process_from_memory_and_cache(b::embed<"shaders/embeded/utility_data.wgsl">().str(), "waylib/utility_data", config);
 	process_from_memory_and_cache(b::embed<"shaders/embeded/vertex_data.wgsl">().str(), "waylib/vertex_data", config);
@@ -939,6 +959,7 @@ std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> 
 //////////////////////////////////////////////////////////////////////
 // # Miscilanious
 //////////////////////////////////////////////////////////////////////
+
 
 bool format_is_srgb(WGPUTextureFormat format) {
 	switch(static_cast<wgpu::TextureFormat>(format)) {

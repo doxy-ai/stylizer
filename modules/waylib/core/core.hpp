@@ -379,7 +379,7 @@ WAYLIB_BEGIN_NAMESPACE
 		result<gpu_buffer*> upload(wgpu_state& state, EMSCRIPTEN_FLAGS(WGPUBufferUsage) usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage, bool free_cpu_data = false, bool mapped_at_creation = false) WAYLIB_TRY {
 			if(gpu_data == nullptr) {
 				gpu_data = state.device.createBuffer(WGPUBufferDescriptor {
-					.label = toWGPU(label ? *label : "Generic Waylib Buffer"),
+					.label = toWGPU(*label ? *label : "Generic Waylib Buffer"),
 					.usage = usage,
 					.size = offset + size,
 					.mappedAtCreation = mapped_at_creation,
@@ -423,17 +423,7 @@ WAYLIB_BEGIN_NAMESPACE
 			if(label) (delete[] *label, label = nullptr);
 		}
 
-		static result<gpu_buffer> zero_buffer(wgpu_state& state, size_t minimum_size /* = 0 */) {
-			static result<gpu_buffer> zeroBuffer = gpu_bufferC{};
-
-			if(!*zeroBuffer || minimum_size > zeroBuffer->size) {
-				zeroBuffer->size = minimum_size;
-				std::vector<std::byte> zeroData(zeroBuffer->size, std::byte{0});
-				if(*zeroBuffer) zeroBuffer->release();
-				zeroBuffer = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage | wgpu::BufferUsage::Uniform | wgpu::BufferUsage::Vertex);
-			}
-			return zeroBuffer;
-		}
+		static result<gpu_buffer> zero_buffer(wgpu_state& state, size_t minimum_size = 0, drawing_state* draw = nullptr);
 
 		template<typename T = std::byte>
 		result<gpu_buffer*> write(wgpu_state& state, std::span<T> data, size_t offset = 0) WAYLIB_TRY {
@@ -703,6 +693,8 @@ WAYLIB_BEGIN_NAMESPACE
 		void defer(F&& on_release) { finalizers->emplace_back(std::move(on_release)); }
 
 		result<std::array<wgpu::CommandBuffer, 2>> record_draw_commands() WAYLIB_TRY {
+			assert(render_pass); assert(pre_encoder); assert(render_encoder);
+
 			render_pass.end();
 
 			wgpu::CommandBufferDescriptor cmdBufferDescriptor = {};
@@ -710,8 +702,8 @@ WAYLIB_BEGIN_NAMESPACE
 			wgpu::CommandBuffer commands = pre_encoder.finish(cmdBufferDescriptor);
 			cmdBufferDescriptor.label = toWGPU("Waylib Frame Render Command Buffer");
 			wgpu::CommandBuffer render_commands = render_encoder.finish(cmdBufferDescriptor);
-			pre_encoder.release(); pre_encoder = nullptr;
-			render_encoder.release(); render_encoder = nullptr;
+			std::exchange(pre_encoder, nullptr).release();
+			std::exchange(render_encoder, nullptr).release();
 
 			return std::array<wgpu::CommandBuffer, 2>{commands, render_commands};
 		} WAYLIB_CATCH
@@ -1140,6 +1132,16 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
+		static result<mesh> fullscreen_mesh(wgpu_state& state) {
+			mesh out{}; out.zero();
+			out.vertex_count = 3;
+			out.triangle_count = 1;
+			out.positions = {true, new vec4f[]{vec4f(-1, -3, .99, 1), vec4f(3, 1, .99, 1), vec4f(-1, 1, .99, 1)}};
+			out.uvs = {true, new vec4f[]{vec4f(0, 2, 0, 0), vec4f(2, 0, 0, 0), vec4f(0)}};
+			if(auto res = out.upload(state); !res) return unexpected(res.error());
+			return out;
+		}
+
 		static const std::array<WGPUVertexBufferLayout, 8>& mesh_layout() {
 			static WGPUVertexAttribute positionAttribute = {
 				.format = wgpu::VertexFormat::Float32x4,
@@ -1276,13 +1278,13 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 
 		result<mesh*> upload(wgpu_state& state) WAYLIB_TRY {
-			if(vertex_buffer) vertex_buffer.release();
 			auto metadata = this->metadata();
 			auto gpuMetadata = this->gpu_metadata();
 			size_t attribute_size = metadata.vertex_count * sizeof(vec4f);
 
 			gpu_buffer buffer = gpu_bufferC{
-				.size = metadata.vertex_buffer_size
+				.size = metadata.vertex_buffer_size,
+				.label = "Waylib Vertex Buffer"
 			};
 			buffer.upload(state, wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage, false, true);
 			std::byte* mapped = (std::byte*)buffer.map_writable(state);
@@ -1301,8 +1303,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 			result<gpu_buffer> indexBuffer = gpu_buffer{};
 			if(*indices)
-				indexBuffer = gpu_buffer::create(state, {(std::byte*)*indices, triangle_count * sizeof(index_t) * 3}, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index);
-			else if(index_buffer) index_buffer.release();
+				indexBuffer = gpu_buffer::create(state, {(std::byte*)*indices, triangle_count * sizeof(index_t) * 3}, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Index, {"Waylib Index Buffer"});
 			if(!indexBuffer) return unexpected(indexBuffer.error());
 
 			if(vertex_buffer) vertex_buffer.release();
@@ -1346,15 +1347,25 @@ WAYLIB_BEGIN_NAMESPACE
 			return materials()[i];
 		}
 
-		result<model*> upload(wgpu_state& state, std::span<const WGPUColorTargetState> gbuffer_targets) {
+		result<model*> upload(
+			wgpu_state& state, 
+			std::span<const WGPUColorTargetState> gbuffer_targets,
+			WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout = {},
+			material_configuration material_config = {}
+		) {
 			for(auto& mesh: meshes())
 				if(auto res = mesh.upload(state); !res) return unexpected(res.error());
 			for(auto& material: materials())
-				if(auto res = material.upload(state, gbuffer_targets); !res) return unexpected(res.error());
+				if(auto res = material.upload(state, gbuffer_targets, mesh_layout, material_config); !res) return unexpected(res.error());
 			return this;
 		}
 		template<GbufferTargetProvider Tgbuffer>
-		result<model*> upload(wgpu_state& state, Tgbuffer& gbuffer) { return upload(state, gbuffer.targets()); }
+		result<model*> upload(
+			wgpu_state& state, 
+			Tgbuffer& gbuffer, 
+			WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout = {},
+			material_configuration material_config = {}
+		) { return upload(state, gbuffer.targets(), mesh_layout, material_config); }
 
 		void release() {
 			// TODO: Implement
@@ -1380,9 +1391,8 @@ WAYLIB_BEGIN_NAMESPACE
 				}
 			};
 
-			gpu_buffer instanceBuffer;
 			if(instances.size() > 0) {
-				instanceBuffer = gpu_bufferC{.size = instances.size() * sizeof(model_instance)};
+				gpu_buffer instanceBuffer = gpu_bufferC{.size = std::max<size_t>(instances.size() * sizeof(model_instance), 144), .label = "Waylib Instance Buffer"};
 				instanceBuffer.upload(draw.state());
 				instanceBuffer.write(draw.state(), instances);
 				draw.defer([instanceBuffer]{ const_cast<gpu_buffer&>(instanceBuffer).release(); });
@@ -1390,7 +1400,7 @@ WAYLIB_BEGIN_NAMESPACE
 				bindings[2].buffer = instanceBuffer.gpu_data;
 				bindings[2].size = instanceBuffer.size;
 			} else {
-				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), sizeof(model_instance));
+				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), sizeof(model_instance), &draw);
 				if(!zeroBuffer) return unexpected(zeroBuffer.error());
 
 				bindings[2].buffer = zeroBuffer->gpu_data;
@@ -1406,21 +1416,18 @@ WAYLIB_BEGIN_NAMESPACE
 				auto metadata = mesh.metadata();
 				size_t attribute_size = metadata.vertex_count * sizeof(vec4f);
 				size_t index_size = metadata.triangle_count * 3 * sizeof(index_t);
-				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), std::max(attribute_size, index_size));
+				auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), std::max<size_t>(attribute_size, index_size), &draw); // TODO: Why is the min index size 144?
 				if(!zeroBuffer) return unexpected(zeroBuffer.error());
 
 				auto drawTimeBindGroup = draw.gbuffer().bind_group(draw, mat);
 				if(!drawTimeBindGroup) return unexpected(drawTimeBindGroup.error());
 				draw.render_pass.setBindGroup(0, *drawTimeBindGroup, 0, nullptr);
-				draw.defer([group = *drawTimeBindGroup]{ const_cast<wgpu::BindGroup&>(group).release(); });
-
-				if(mat.bind_group)
-					draw.render_pass.setBindGroup(2, mat.bind_group, 0, nullptr);
+				// draw.defer([group = *drawTimeBindGroup]{ /* const_cast<wgpu::BindGroup&>(group).release(); */ });
 
 				bindings[0].buffer = mesh.vertex_buffer;
 				bindings[0].size = metadata.vertex_buffer_size;
 				bindings[1].buffer = metadata.is_indexed ? mesh.index_buffer : zeroBuffer->gpu_data;
-				bindings[1].size = index_size;
+				bindings[1].size = metadata.is_indexed ? index_size : zeroBuffer->size;
 
 				auto perMeshBindGroup = draw.state().device.createBindGroup(WGPUBindGroupDescriptor {
 					.label = toWGPU("Waylib Mesh Data Bind Group"),
@@ -1429,7 +1436,10 @@ WAYLIB_BEGIN_NAMESPACE
 					.entries = bindings.data()
 				});
 				draw.render_pass.setBindGroup(1, perMeshBindGroup, 0, nullptr);
-				draw.defer([perMeshBindGroup]{ const_cast<wgpu::BindGroup&>(perMeshBindGroup).release(); });
+				// draw.defer([perMeshBindGroup]{ /* const_cast<wgpu::BindGroup&>(perMeshBindGroup).release(); */ });
+
+				if(mat.bind_group)
+					draw.render_pass.setBindGroup(2, mat.bind_group, 0, nullptr);
 
 				// Position
 				draw.render_pass.setVertexBuffer(0, mesh.vertex_buffer, metadata.position_start, attribute_size);

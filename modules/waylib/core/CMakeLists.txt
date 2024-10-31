@@ -41,6 +41,7 @@ function(waylib_embed TARGET FILENAME)
 	b_embed(${TARGET} ${FILENAME})
 endfunction(waylib_embed)
 
+waylib_embed(waylib_core shaders/embeded/inverse.wgsl)
 waylib_embed(waylib_core shaders/embeded/mesh_data.wgsl)
 waylib_embed(waylib_core shaders/embeded/utility_data.wgsl)
 waylib_embed(waylib_core shaders/embeded/vertex_data.wgsl)
