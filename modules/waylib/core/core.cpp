@@ -137,9 +137,9 @@ drawing_state wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear
 //////////////////////////////////////////////////////////////////////
 
 
-struct texture image::upload(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
+texture image::upload(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
 	config.format = config.format ? *config.format : static_cast<WGPUTextureFormat>(convert_format(format));
-	auto out = texture::create(state, size, config);
+	auto out = texture::create(state, vec3u(size, frames), config);
 
 	wgpu::ImageCopyTexture destination;
 	destination.texture = out.gpu_data;
@@ -156,6 +156,33 @@ struct texture image::upload(wgpu_state& state, texture_create_configuation conf
 	wgpu::Extent3D extent = {size.x, size.y, static_cast<uint32_t>(frames)};
 	state.device.getQueue().writeTexture(destination, *data, source.bytesPerRow * size.y * frames, source, extent);
 
+	if(take_ownership_of_image) out.cpu_data = {true, new image(std::move(*this))};
+	else out.cpu_data = this;
+	return out;
+}
+
+cube_texture image::upload_frames_as_cube(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
+	config.format = config.format ? *config.format : static_cast<WGPUTextureFormat>(convert_format(format));
+	auto with_view = config.with_view;
+	config.with_view = false;
+	auto out = cube_texture::create(state, vec3u(size, frames), config);
+
+	wgpu::ImageCopyTexture destination;
+	destination.texture = out.gpu_data;
+	destination.mipLevel = 0;
+	destination.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
+	destination.aspect = wgpu::TextureAspect::All; // only relevant for depth/Stencil textures
+
+	// Arguments telling how the C++ side pixel memory is laid out
+	wgpu::TextureDataLayout source;
+	source.offset = 0;
+	source.bytesPerRow = bytes_per_pixel() * size.x;
+	source.rowsPerImage = size.y;
+
+	wgpu::Extent3D extent = {size.x, size.y, static_cast<uint32_t>(frames)};
+	state.device.getQueue().writeTexture(destination, *data, source.bytesPerRow * size.y * frames, source, extent);
+
+	if(with_view) out.create_view();
 	if(take_ownership_of_image) out.cpu_data = {true, new image(std::move(*this))};
 	else out.cpu_data = this;
 	return out;
@@ -429,7 +456,7 @@ const char* texture::format_to_string(WGPUTextureFormat format) {
 }
 
 texture& texture::copy_to_buffer_record_existing(WGPUCommandEncoder encoder, gpu_buffer& buffer, size_t mip_level /* = 0 */) {
-	assert(mip_level <= mip_levels);
+	assert(mip_level <= gpu_data.getMipLevelCount());
 	auto size = this->size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
 
 	wgpu::ImageCopyTexture source = wgpu::Default;
@@ -462,7 +489,7 @@ image texture::download(wgpu_state& state, image_format format /* = image_format
 texture& texture::generate_mipmaps(wgpu_state& state, uint32_t max_levels /* = 0 */) { // 0 -> no maximum
 	auto size = this->size();
 	if(max_levels == 0) max_levels = std::bit_width(std::min(size.x, size.y));
-	mip_levels = max_levels;
+	uint32_t mip_levels = max_levels;
 
 	auto format = this->format();
 	auto formatStr = std::string(format_to_string(format));

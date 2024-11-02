@@ -182,7 +182,39 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 		inline size_t bytes_per_pixel() { return bytes_per_pixel(format); }
 
+		static inline image merge(std::span<const image> images) {
+			assert(images.size() > 1);
+
+			image out = images[0];
+			out.frames = images.size();
+			size_t size_each = out.size.x * out.size.y;
+			switch(out.format) {
+			break; case image_format::RGBA:
+			 	out.rgba = {true, new colorC[size_each * out.frames]};
+				size_each *= sizeof(colorC);
+			break; case image_format::RGBA8:
+				out.rgba8 = {true, new color8C[size_each * out.frames]};
+				size_each *= sizeof(color8C);
+			break; case image_format::Gray:
+				out.gray = {true, new float[size_each * out.frames]};
+				size_each *= sizeof(float);
+			break; case image_format::Gray8:
+				out.gray8 = {true, new uint8_t[size_each * out.frames]};
+				size_each *= sizeof(uint8_t);
+			break; default: WAYLIB_THROW("Invalid image format... failed to merge!");
+			}
+
+			size_t i = 0;
+			for(auto& other: images) {
+				assert(out.size == other.size);
+				assert(out.format == other.format);
+				std::memcpy(*out.gray8 + i++ * size_each, *other.data, size_each);
+			}
+			return out;
+		}
+
 		struct texture upload(wgpu_state& state, texture_create_configuation config = {}, bool take_ownership_of_image = true);
+		struct cube_texture upload_frames_as_cube(wgpu_state& state, texture_create_configuation config = {}, bool take_ownership_of_image = true);
 	};
 
 
@@ -195,7 +227,6 @@ WAYLIB_BEGIN_NAMESPACE
 		WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(texture)
 		texture(texture&& other) { *this = std::move(other); }
 		texture& operator=(texture&& other) {
-			mip_levels = std::exchange(other.mip_levels, 1);
 			cpu_data = std::exchange(other.cpu_data, nullptr);
 			gpu_data = std::exchange(other.gpu_data, nullptr);
 			view = std::exchange(other.view, nullptr);
@@ -236,7 +267,7 @@ WAYLIB_BEGIN_NAMESPACE
 		static const char* format_to_string(WGPUTextureFormat format);
 
 		wgpu::TextureView create_mip_view(uint32_t base_mip = 0, uint32_t mip_count = 1, wgpu::TextureAspect aspect = wgpu::TextureAspect::All) {
-			assert(base_mip + mip_count <= mip_levels);
+			assert(base_mip + mip_count <= gpu_data.getMipLevelCount());
 			return gpu_data.createView(WGPUTextureViewDescriptor{
 				.format = format(),
 				.dimension = wgpu::TextureViewDimension::_2D,
@@ -250,18 +281,17 @@ WAYLIB_BEGIN_NAMESPACE
 
 		texture& create_view(wgpu::TextureAspect aspect = wgpu::TextureAspect::All) {
 			if(view) view.release();
-			view = create_mip_view(0, 1, aspect);
+			view = create_mip_view(0, gpu_data.getMipLevelCount(), aspect);
 			return *this;
 		}
 
 		static texture create(wgpu_state& state, vec3u size, texture_create_configuation config = {}) {
 			texture out;
-			out.mip_levels = config.mip_levels;
 			auto format = config.format ? *config.format : wgpu::TextureFormat::RGBA8UnormSrgb;
 			out.gpu_data = state.device.createTexture(WGPUTextureDescriptor {
-				.label = toWGPU("Waylib Color Buffer"),
+				.label = toWGPU("Waylib Texture"),
 				.usage = config.usage,
-				.dimension = config.dimension,
+				.dimension = wgpu::TextureDimension::_2D,
 				.size = {size.x, size.y, size.z},
 				.format = format,
 				.mipLevelCount = config.mip_levels,
@@ -281,7 +311,7 @@ WAYLIB_BEGIN_NAMESPACE
 			return out;
 		}
 		static texture create(wgpu_state& state, vec2u size, texture_create_configuation config = {}) {
-			return create(state, vec3u(size, 1), config);
+			return create(state, {size.x, size.y, 1}, config);
 		}
 
 		void release() {
@@ -325,7 +355,7 @@ WAYLIB_BEGIN_NAMESPACE
 		image download(wgpu_state& state, image_format format = image_format::RGBA8, size_t mip_level = 0);
 
 		texture& copy_record_existing(WGPUCommandEncoder encoder, texture& source_texture, size_t target_mip_level = 0, size_t source_mip_level = 0) {
-			assert(target_mip_level <= mip_levels);
+			assert(target_mip_level <= gpu_data.getMipLevelCount());
 			auto size = this->size() / vec2u(target_mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
 
 			wgpu::ImageCopyTexture source = wgpu::Default;
@@ -354,6 +384,70 @@ WAYLIB_BEGIN_NAMESPACE
 
 		drawing_state blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer = {});
 		drawing_state blit_to(wgpu_state& state, struct shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color = {}, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer = {});
+	};
+
+
+//////////////////////////////////////////////////////////////////////
+// # Cube Texture
+//////////////////////////////////////////////////////////////////////
+
+
+	struct cube_texture: public texture {
+		static cube_texture create(wgpu_state& state, vec3u size, texture_create_configuation config = {}) {
+			assert(size.z % 6 == 0);
+
+			cube_texture out;
+			// out.mip_levels = config.mip_levels;
+			config.mip_levels = 1; // TODO: Support cubemap mipmapping
+			auto format = config.format ? *config.format : wgpu::TextureFormat::RGBA8UnormSrgb;
+			out.gpu_data = state.device.createTexture(WGPUTextureDescriptor {
+				.label = toWGPU("Waylib Cubemap Texture"),
+				.usage = config.usage,
+				.dimension = wgpu::TextureDimension::_2D,
+				.size = {size.x, size.y, size.z},
+				.format = format,
+				.mipLevelCount = config.mip_levels,
+				.sampleCount = 1,
+				.viewFormatCount = 1,
+				.viewFormats = &format
+			});
+
+			if(config.with_view) out.create_view();
+			switch(config.sampler_type) {
+			break; case texture_create_sampler_type::None:
+			break; case texture_create_sampler_type::Nearest:
+				out.sampler = default_sampler(state);
+			break; case texture_create_sampler_type::Trilinear:
+				out.sampler = trilinear_sampler(state);
+			}
+			return out;
+		}
+
+		static inline cube_texture create_from_images(wgpu_state& state, std::span<const image> images, texture_create_configuation config = {}, bool release_images = false) {
+			auto image = image::merge(images);
+			if(release_images) for(auto& image: images)
+				const_cast<struct image&>(image).release();
+			return image.upload_frames_as_cube(state, config, true);
+		}
+
+		wgpu::TextureView create_mip_view(uint32_t base_mip = 0, uint32_t mip_count = 1, uint32_t base_layer = 0, uint32_t layer_count = 1, wgpu::TextureAspect aspect = wgpu::TextureAspect::All) {
+			assert(base_mip + mip_count <= gpu_data.getMipLevelCount());
+			return gpu_data.createView(WGPUTextureViewDescriptor{
+				.format = format(),
+				.dimension = wgpu::TextureViewDimension::Cube,
+				.baseMipLevel = base_mip,
+				.mipLevelCount = mip_count,
+				.baseArrayLayer = base_layer,
+				.arrayLayerCount = layer_count,
+				.aspect = aspect
+			});
+		}
+
+		texture& create_view(wgpu::TextureAspect aspect = wgpu::TextureAspect::All) {
+			if(view) view.release();
+			view = create_mip_view(0, gpu_data.getMipLevelCount(), 0, gpu_data.getDepthOrArrayLayers(), aspect);
+			return *this;
+		}
 	};
 
 
@@ -516,7 +610,7 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 
 		gpu_buffer& copy_to_texture_record_existing(WGPUCommandEncoder encoder, texture& target, size_t mip_level = 0) {
-			assert(mip_level <= target.mip_levels);
+			assert(mip_level <= target.gpu_data.getMipLevelCount());
 			auto size = target.size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
 
 			wgpu::ImageCopyBuffer source = wgpu::Default;

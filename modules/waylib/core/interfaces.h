@@ -200,11 +200,7 @@ typedef struct {
 
 // Texture (GPU texture data)
 typedef struct {
-	uint32_t mip_levels
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
-		= 1
-#endif
-	; WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(image, imageC)*)) cpu_data;
+	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(image, imageC)*)) cpu_data;
 	WAYLIB_C_OR_CPP_TYPE(WGPUTexture, wgpu::Texture) gpu_data;
 	WAYLIB_C_OR_CPP_TYPE(WGPUTextureView, wgpu::TextureView) view;
 	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUSampler, wgpu::Sampler)) sampler
@@ -472,10 +468,6 @@ typedef struct {
 	WAYLIB_OPTIONAL(WGPUTextureFormat) format
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
 		= {}
-#endif
-	; WGPUTextureDimension dimension
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
-		= wgpu::TextureDimension::_2D
 #endif
 	; WGPUTextureUsage usage
 #ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS

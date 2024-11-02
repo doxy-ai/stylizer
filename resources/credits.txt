@@ -1,1 +1,2 @@
 symmetrical_garden_02_1k.hdr: https://polyhaven.com/a/symmetrical_garden_02
+skybox: https://learnopengl.com/Advanced-OpenGL/Cubemaps
