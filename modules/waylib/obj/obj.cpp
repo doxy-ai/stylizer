@@ -6,7 +6,7 @@
 
 WAYLIB_BEGIN_NAMESPACE
 
-	result<model> obj::load(const std::filesystem::path& file_path) {
+	model obj::load(const std::filesystem::path& file_path) {
 		auto path = std::filesystem::absolute(file_path);
 		tinyobj::ObjReaderConfig reader_config;
 		reader_config.triangulate = true;
@@ -16,8 +16,8 @@ WAYLIB_BEGIN_NAMESPACE
 		tinyobj::ObjReader reader;
 		if (!reader.ParseFromFile(path.string(), reader_config)) {
 			if (!reader.Error().empty())
-				return unexpected(reader.Error());
-			return {};
+				WAYLIB_THROW(reader.Error());
+			WAYLIB_THROW("An unkown error occured while loading " + file_path.string());
 		}
 
 		if (!reader.Warning().empty())

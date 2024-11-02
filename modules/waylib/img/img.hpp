@@ -9,8 +9,8 @@ WAYLIB_BEGIN_NAMESPACE
 	}
 
 	namespace img {
-		result<image> load(const std::filesystem::path& file_path);
-		result<image> load_from_memory(std::span<std::byte> data);
+		image load(const std::filesystem::path& file_path);
+		image load_from_memory(std::span<std::byte> data);
 	}
 
 WAYLIB_END_NAMESPACE

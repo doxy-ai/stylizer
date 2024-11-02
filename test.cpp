@@ -4,13 +4,13 @@
 
 int main() {
 	wl::auto_release window = wl::window::create({800, 600});
-	wl::auto_release state = window.create_default_state().throw_if_error();
-	window.reconfigure_surface_on_resize(state).throw_if_error();
+	wl::auto_release state = window.create_default_state();
+	window.reconfigure_surface_on_resize(state);
 
 	// GBuffer that gets its color format from the window
 	wl::auto_release gbuffer = wl::Gbuffer::create_default(state, window.get_size(), {
 		.color_format = wgpu::TextureFormat::Undefined
-	}).throw_if_error();
+	});
 	window.auto_resize_gbuffer(state, gbuffer);
 
 	auto p = wl::shader_preprocessor{}.initialize_platform_defines(state).initialize_virtual_filesystem();
@@ -34,15 +34,15 @@ fn fragment(vert: vertex_output) -> fragment_output {
 		vec4f(vert.normal, 1.0),
 	);
 }
-	)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment", .preprocessor = &p}).throw_if_error();
+	)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment", .preprocessor = &p});
 
-	wl::auto_release texture = std::move(*wl::img::load("../resources/test.hdr").throw_if_error()
-		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear}).throw_if_error()
-		.generate_mipmaps(state).throw_if_error());
+	wl::auto_release texture = std::move(wl::img::load("../resources/test.hdr")
+		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear})
+		.generate_mipmaps(state));
 
-	wl::auto_release model = wl::obj::load("../resources/suzane_highpoly.obj").throw_if_error();
+	wl::auto_release model = wl::obj::load("../resources/suzane_highpoly.obj");
 	model.meshes()[0].indices = nullptr;
-	model.upload(state, gbuffer).throw_if_error();
+	model.upload(state, gbuffer);
 	wl::auto_release material = wl::material(wl::materialC{
 		.texture_count = 1,
 		.textures = &texture,
@@ -89,9 +89,9 @@ fn fragment(vert: vertex_output) -> fragment_output {
 		vec4f(0.0),
 	);
 }
-	)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment", .preprocessor = &p}).throw_if_error();
-	wl::auto_release skyTexture = wl::img::load("../resources/symmetrical_garden_02_1k.hdr").throw_if_error()
-		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear}).throw_if_error();
+	)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment", .preprocessor = &p});
+	wl::auto_release skyTexture = wl::img::load("../resources/symmetrical_garden_02_1k.hdr")
+		.upload(state, {.sampler_type = wl::texture_create_sampler_type::Trilinear});
 	wl::auto_release<wl::material> skyMat{}; skyMat.zero();
 	skyMat.c().texture_count = 1;
 	skyMat.c().textures = &skyTexture;
@@ -100,7 +100,7 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	skyMat.upload(state, gbuffer, {}, {.depth_function = {}});
 	wl::auto_release<wl::model> sky{}; sky.zero();
 	sky.c().mesh_count = 1;
-	sky.c().meshes = {true, new wl::mesh(wl::mesh::fullscreen_mesh(state).throw_if_error())};
+	sky.c().meshes = {true, new wl::mesh(wl::mesh::fullscreen_mesh(state))};
 	sky.c().material_count = 1;
 	sky.c().materials = &skyMat;
 	sky.c().mesh_materials = nullptr;
@@ -111,21 +111,21 @@ fn fragment(vert: vertex_output) -> fragment_output {
 
 	WAYLIB_MAIN_LOOP(!window.should_close(),
 	// while(!window.should_close()) {
-		utility_buffer = time.calculate().update_utility_buffer(state, utility_buffer).throw_if_error();
+		utility_buffer = time.calculate().update_utility_buffer(state, utility_buffer);
 
 		camera.position = wl::vec3f(2 * cos(time.since_start), sin(time.since_start / 4), 2 * sin(time.since_start));
-		utility_buffer = camera.calculate_matricies(window.get_size()).update_utility_buffer(state, utility_buffer).throw_if_error();
+		utility_buffer = camera.calculate_matricies(window.get_size()).update_utility_buffer(state, utility_buffer);
 
-		wl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}, utility_buffer).throw_if_error();
+		wl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}, utility_buffer);
 		{
-			sky.draw(draw).throw_if_error();
+			sky.draw(draw);
 
-			model.draw(draw).throw_if_error();
+			model.draw(draw);
 		}
-		draw.draw().throw_if_error();
+		draw.draw();
 
 		// Present gbuffer's color
-		window.present(state, gbuffer.color()).throw_if_error();
+		window.present(state, gbuffer.color());
 	// }
 	);
 }

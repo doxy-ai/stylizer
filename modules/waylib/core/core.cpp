@@ -64,14 +64,14 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
-result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAYLIB_NULLABLE(WGPUSurface) surface_ /* = nullptr */, bool prefer_low_power /* = false */) WAYLIB_TRY {
+wgpu_state wgpu_state::default_from_instance(WGPUInstance instance_, WAYLIB_NULLABLE(WGPUSurface) surface_ /* = nullptr */, bool prefer_low_power /* = false */) {
 	wgpu::Instance instance = instance_; wgpu::Surface surface = surface_;
 
 	wgpu::Adapter adapter = instance.requestAdapter(WGPURequestAdapterOptions{
 		.compatibleSurface = surface,
 		.powerPreference = prefer_low_power ? wgpu::PowerPreference::LowPower : wgpu::PowerPreference::HighPerformance
 	});
-	if(!adapter) return unexpected("Failed to find adapter.");
+	if(!adapter) WAYLIB_THROW("Failed to find adapter.");
 
 	WGPUFeatureName float32filterable = WGPUFeatureName_Float32Filterable;
 	wgpu::Device device = adapter.requestDevice(WGPUDeviceDescriptor{
@@ -87,11 +87,7 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 			std::stringstream s;
 			s << "Device lost: reason " << wgpu::DeviceLostReason{reason};
 			if (message) s << " (" << message << ")";
-#ifdef __cpp_exceptions
-			throw exception(s.str());
-#else // __cpp_exceptions
-			assert(false, s.str().c_str());
-#endif // __cpp_exceptions
+			WAYLIB_THROW(s.str());
 		},
 #else // __EMSCRIPTEN__
 		.deviceLostCallbackInfo = {
@@ -100,11 +96,7 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 				std::stringstream s;
 				s << "Device " << wgpu::Device{*device} << " lost: reason " << wgpu::DeviceLostReason{reason};
 				if (message.length) s << " (" << std::string_view{message.data, message.length} << ")";
-#ifdef __cpp_exceptions
-				throw exception(s.str());
-#else // __cpp_exceptions
-				assert(false, s.str().c_str());
-#endif // __cpp_exceptions
+				WAYLIB_THROW(s.str());
 			}
 		},
 		.uncapturedErrorCallbackInfo = {
@@ -112,26 +104,22 @@ result<wgpu_state> wgpu_state::default_from_instance(WGPUInstance instance_, WAY
 				std::stringstream s;
 				s << "Uncaptured device error: type " << wgpu::ErrorType{type};
 				if (message.length) s << " (" << std::string_view{message.data, message.length} << ")";
-#ifdef __cpp_exceptions
-				throw exception(s.str());
-#else // __cpp_exceptions
-				errors::set(s.str());
-#endif // __cpp_exceptions
+				WAYLIB_THROW(s.str());
 			}
 		}
 #endif // __EMSCRIPTEN__
 	});
-	if(!device) return unexpected("Failed to create device.");
+	if(!device) WAYLIB_THROW("Failed to create device.");
 
 	return wgpu_stateC{instance, adapter, device, surface, wgpu::TextureFormat::Undefined};
-} WAYLIB_CATCH
+}
 
-result<texture> wgpu_state::current_surface_texture() {
+texture wgpu_state::current_surface_texture() {
 	wgpu::SurfaceTexture texture_;
 	surface.getCurrentTexture(&texture_);
 	if(texture_.status != wgpu::SurfaceGetCurrentTextureStatus::Success) {
 		std::stringstream s; s << "Texture error: " << wgpu::SurfaceGetCurrentTextureStatus{texture_.status};
-		return unexpected(s.str());
+		WAYLIB_THROW(s.str());
 	}
 
 	texture out = textureC{.gpu_data = texture_.texture};
@@ -139,64 +127,8 @@ result<texture> wgpu_state::current_surface_texture() {
 	return out;
 }
 
-result<struct drawing_state> wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */){
-	auto texture = current_surface_texture();
-	if(!texture) return unexpected(texture.error());
-	return texture->begin_drawing(*this, clear_color, utility_buffer);
-}
-
-WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(default_state_from_instance)(
-	WGPUInstance instance,
-	WAYLIB_NULLABLE(WGPUSurface) surface /*= nullptr*/,
-	bool prefer_low_power /*= false*/
-) {
-	return res2opt(result<WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)>(
-		wgpu_state::default_from_instance(instance, surface, prefer_low_power)
-	));
-}
-
-WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(create_state)(
-	WAYLIB_NULLABLE(WGPUSurface) surface /*= nullptr*/,
-	bool prefer_low_power /*= false*/
-) {
-	return res2opt(result<WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)>(
-		wgpu_state::create_default(surface, prefer_low_power)
-	));
-}
-
-void WAYLIB_PREFIXED(release_state)(
-	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state_,
-	bool adapter_release /*= true*/,
-	bool instance_release /*= true*/
-) {
-	wgpu_state& state = *static_cast<wgpu_state*>(state_);
-	state.release(adapter_release, instance_release);
-}
-
-WAYLIB_PREFIXED(surface_configuration) WAYLIB_PREFIXED(default_surface_configuration)();
-
-void WAYLIB_PREFIXED(state_configure_surface)(
-	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state_,
-	WAYLIB_PREFIXED_C_CPP_TYPE(vec2u, vec2uC) size,
-	WAYLIB_PREFIXED(surface_configuration) config /*= {}*/
-) {
-	wgpu_state& state = *static_cast<wgpu_state*>(state_);
-	state.configure_surface(fromC(size), config);
-}
-
-WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)) WAYLIB_PREFIXED(current_surface_texture)(
-	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state_
-) {
-	wgpu_state& state = *static_cast<wgpu_state*>(state_);
-	return res2opt<texture, textureC>(state.current_surface_texture());
-}
-
-WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC)) WAYLIB_PREFIXED(begin_drawing_to_surface)(
-	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state_,
-	WAYLIB_OPTIONAL(colorC) clear_color /* = {} */
-) {
-	wgpu_state& state = *static_cast<wgpu_state*>(state_);
-	return res2opt<drawing_state, drawing_stateC>(state.begin_drawing_to_surface(clear_color));
+drawing_state wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */){
+	return current_surface_texture().begin_drawing(*this, clear_color, utility_buffer);
 }
 
 
@@ -205,13 +137,12 @@ WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC)) WAYLI
 //////////////////////////////////////////////////////////////////////
 
 
-result<struct texture> image::upload(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
+struct texture image::upload(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
 	config.format = config.format ? *config.format : static_cast<WGPUTextureFormat>(convert_format(format));
 	auto out = texture::create(state, size, config);
-	if(!out) return out;
 
 	wgpu::ImageCopyTexture destination;
-	destination.texture = out->gpu_data;
+	destination.texture = out.gpu_data;
 	destination.mipLevel = 0;
 	destination.origin = { 0, 0, 0 }; // equivalent of the offset argument of Queue::writeBuffer
 	destination.aspect = wgpu::TextureAspect::All; // only relevant for depth/Stencil textures
@@ -225,8 +156,8 @@ result<struct texture> image::upload(wgpu_state& state, texture_create_configuat
 	wgpu::Extent3D extent = {size.x, size.y, static_cast<uint32_t>(frames)};
 	state.device.getQueue().writeTexture(destination, *data, source.bytesPerRow * size.y * frames, source, extent);
 
-	if(take_ownership_of_image) out->cpu_data = {true, new image(std::move(*this))};
-	else out->cpu_data = this;
+	if(take_ownership_of_image) out.cpu_data = {true, new image(std::move(*this))};
+	else out.cpu_data = this;
 	return out;
 }
 
@@ -497,7 +428,7 @@ const char* texture::format_to_string(WGPUTextureFormat format) {
 	}
 }
 
-result<texture*> texture::copy_to_buffer_record_existing(WGPUCommandEncoder encoder, gpu_buffer& buffer, size_t mip_level /* = 0 */) WAYLIB_TRY {
+texture& texture::copy_to_buffer_record_existing(WGPUCommandEncoder encoder, gpu_buffer& buffer, size_t mip_level /* = 0 */) {
 	assert(mip_level <= mip_levels);
 	auto size = this->size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
 
@@ -510,15 +441,15 @@ result<texture*> texture::copy_to_buffer_record_existing(WGPUCommandEncoder enco
 	destination.layout.offset = 0;
 	destination.layout.rowsPerImage = size.y;
 	static_cast<wgpu::CommandEncoder>(encoder).copyTextureToBuffer(source, destination, { size.x, size.y, 1 });
-	return this;
-} WAYLIB_CATCH
+	return *this;
+}
 
-result<image> texture::download(wgpu_state& state, image_format format /* = image_format::RGBA8 */, size_t mip_level /* = 0 */) WAYLIB_TRY {
+image texture::download(wgpu_state& state, image_format format /* = image_format::RGBA8 */, size_t mip_level /* = 0 */) {
 	auto size = this->size() / vec2u(mip_level + 1); // TODO: Is this a valid means of compensating for mip level?
 	gpu_buffer buffer = gpu_bufferC{.size = bytes_per_pixel(this->format()) * size.x * size.y};
-	if(auto res = buffer.upload(state, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead); !res) return unexpected(res.error());
-	if(auto res = copy_to_buffer(state, buffer); !res) return unexpected(res.error());
-	if(auto res = buffer.download(state, false); !res) return unexpected(res.error());
+	buffer.upload(state, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead);
+	this->copy_to_buffer(state, buffer);
+	buffer.download(state, false);
 
 	image out;
 	out.format = format;
@@ -526,42 +457,36 @@ result<image> texture::download(wgpu_state& state, image_format format /* = imag
 	out.size = size;
 	out.frames = 1;
 	return out;
-} WAYLIB_CATCH
+}
 
-result<texture*> texture::generate_mipmaps(wgpu_state& state, uint32_t max_levels /* = 0 */) { // 0 -> no maximum
+texture& texture::generate_mipmaps(wgpu_state& state, uint32_t max_levels /* = 0 */) { // 0 -> no maximum
 	auto size = this->size();
 	if(max_levels == 0) max_levels = std::bit_width(std::min(size.x, size.y));
 	mip_levels = max_levels;
 
 	auto format = this->format();
 	auto formatStr = std::string(format_to_string(format));
-	auto tmpMipShader = shader::from_wgsl(state, R"_(
+	wl::auto_release mipShader = shader::from_wgsl(state, R"_(
 @group(0) @binding(0) var previousMipLevel: texture_2d<f32>;
 @group(0) @binding(1) var nextMipLevel: texture_storage_2d<)_" + formatStr + R"_(, write>;
 
 @compute @workgroup_size(8, 8)
 fn compute(@builtin(global_invocation_id) id: vec3<u32>) {
-    let offset = vec2<u32>(0, 1);
-    let color = (
-        textureLoad(previousMipLevel, 2 * id.xy + offset.xx, 0) +
-        textureLoad(previousMipLevel, 2 * id.xy + offset.xy, 0) +
-        textureLoad(previousMipLevel, 2 * id.xy + offset.yx, 0) +
-        textureLoad(previousMipLevel, 2 * id.xy + offset.yy, 0)
-    ) * 0.25;
-    textureStore(nextMipLevel, id.xy, color);
+	let offset = vec2<u32>(0, 1);
+	let color = (
+		textureLoad(previousMipLevel, 2 * id.xy + offset.xx, 0) +
+		textureLoad(previousMipLevel, 2 * id.xy + offset.xy, 0) +
+		textureLoad(previousMipLevel, 2 * id.xy + offset.yx, 0) +
+		textureLoad(previousMipLevel, 2 * id.xy + offset.yy, 0)
+	) * 0.25;
+	textureStore(nextMipLevel, id.xy, color);
 })_", {.compute_entry_point = "compute"});
-	if(!tmpMipShader) return unexpected(tmpMipShader.error());
-	wl::auto_release mipShader = std::move(*tmpMipShader);
 
 	auto newTexture = create(state, size, {.format = {format_remove_srgb(format)}, .usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::StorageBinding, .mip_levels = mip_levels});
-	if(!newTexture) return unexpected(newTexture.error());
-	if(auto res = newTexture->copy(state, *this); !res) return res;
+	newTexture.copy(state, *this);
 
-	result<wgpu::TextureView> tmpView;
-	if(tmpView = newTexture->create_mip_view(0); !tmpView) return unexpected(tmpView.error());
-	auto previousView = *tmpView;
-	if(tmpView = newTexture->create_mip_view(1); !tmpView) return unexpected(tmpView.error());
-	auto nextView = *tmpView;
+	wgpu::TextureView previousView = newTexture.create_mip_view(0);
+	auto nextView = newTexture.create_mip_view(1);
 	std::array<texture, 2> textures {textureC{.view = previousView}, textureC{.view = nextView}};
 
 	computer compute = computerC{
@@ -580,22 +505,24 @@ fn compute(@builtin(global_invocation_id) id: vec3<u32>) {
 		compute.dispatch(state, vec3u((invocationCount + vec2u(workgroupSizePerDim) - vec2u(1)) / vec2u(workgroupSizePerDim), 1));
 
 		if(level < mip_levels - 1) {
+			textures[0].view.release();
 			textures[0].view = textures[1].view;
-			if(tmpView = newTexture->create_mip_view(level + 1); !tmpView) return unexpected(tmpView.error());
-			textures[1].view = *tmpView;
+			textures[1].view = newTexture.create_mip_view(level + 1);;
 			size = size / vec2u(2);
 		}
 	}
+	textures[0].view.release();
+	textures[1].view.release();
 
-	if(view) newTexture->create_view();
-	if(sampler) newTexture->sampler = std::exchange(sampler, nullptr);
+	if(view) newTexture.create_view();
+	if(sampler) newTexture.sampler = std::exchange(sampler, nullptr);
 
 	release();
-	(*this) = std::move(*newTexture);
-	return this;
+	(*this) = std::move(newTexture);
+	return *this;
 }
 
-result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
+drawing_state texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	static WGPUTextureViewDescriptor viewDesc = {
 		// .format = color.getFormat(),
 		.dimension = wgpu::TextureViewDimension::_2D,
@@ -678,10 +605,10 @@ result<drawing_state> texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	if(utility_buffer) out.utility_buffer = static_cast<gpu_bufferC*>(&utility_buffer.value);
 	return {{std::move(out)}};
-} WAYLIB_CATCH
+}
 
 
-result<texture*> texture::blit(drawing_state& draw, shader& blit_shader, bool dirty /* = false */) {
+texture& texture::blit(drawing_state& draw, shader& blit_shader, bool dirty /* = false */) {
 	static std::map<WGPUShaderModule, material> material_map = {};
 	material* blitMaterial;
 	if(material_map.contains(blit_shader.module) && !dirty)
@@ -711,13 +638,13 @@ result<texture*> texture::blit(drawing_state& draw, shader& blit_shader, bool di
 	draw.render_pass.setPipeline(blitMaterial->pipeline);
 	draw.render_pass.setBindGroup(0, bindGroup, 0, nullptr);
 	draw.render_pass.draw(3, 1, 0, 0);
-	return this;
+	return *this;
 }
 
-result<texture*> texture::blit(drawing_state& draw) {
+texture& texture::blit(drawing_state& draw) {
 	static auto_release<shader> blitShader = {};
-	if(!blitShader) {
-		auto tmp = shader::from_wgsl(draw.state(), R"_(
+	if(!blitShader)
+		blitShader = shader::from_wgsl(draw.state(), R"_(
 struct vertex_output {
 	@builtin(position) raw_position: vec4f,
 	@location(0) uv: vec2f
@@ -746,27 +673,20 @@ fn fragment(vert: vertex_output) -> @location(0) vec4f {
 	return textureSample(texture, sampler_, vert.uv);
 }
 		)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment"});
-		if(!tmp) return unexpected(tmp.error());
-		blitShader = std::move(*tmp);
-	}
 
 	return blit(draw, blitShader, false);
 }
 
-result<drawing_state> texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
+drawing_state texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
-	if(!draw) return unexpected(draw.error());
-	blit(*draw);
-	if(auto res = draw->draw(); !res) return unexpected(res.error());
-	return draw;
+	blit(draw);
+	return draw.draw();
 }
 
-result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
+drawing_state texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
-	if(!draw) return unexpected(draw.error());
-	blit(*draw, blit_shader);
-	if(auto res = draw->draw(); !res) return unexpected(res.error());
-	return draw;
+	blit(draw, blit_shader);
+	return draw.draw();
 }
 
 
@@ -775,14 +695,14 @@ result<drawing_state> texture::blit_to(wgpu_state& state, shader& blit_shader, t
 //////////////////////////////////////////////////////////////////////
 
 
-result<gpu_buffer> gpu_buffer::zero_buffer(wgpu_state& state, size_t minimum_size /* = 0 */, drawing_state* draw /* = nullptr */) {
-	static result<gpu_buffer> zeroBuffer = gpu_bufferC{};
+gpu_buffer gpu_buffer::zero_buffer(wgpu_state& state, size_t minimum_size /* = 0 */, drawing_state* draw /* = nullptr */) {
+	static gpu_buffer zeroBuffer{};
 
-	if(!*zeroBuffer || minimum_size > zeroBuffer->size) {
-		zeroBuffer->size = minimum_size + minimum_size % 4;
-		std::vector<std::byte> zeroData(zeroBuffer->size, std::byte{0});
-		if(*zeroBuffer && !draw) zeroBuffer->release();
-		else if(*zeroBuffer) draw->defer([gpu_data = zeroBuffer->gpu_data] { const_cast<wgpu::Buffer&>(gpu_data).release(); });
+	if(!zeroBuffer || minimum_size > zeroBuffer.size) {
+		zeroBuffer.size = minimum_size + minimum_size % 4;
+		std::vector<std::byte> zeroData(zeroBuffer.size, std::byte{0});
+		if(zeroBuffer && !draw) zeroBuffer.release();
+		else if(zeroBuffer) draw->defer([gpu_data = zeroBuffer.gpu_data] { const_cast<wgpu::Buffer&>(gpu_data).release(); });
 		zeroBuffer = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage | wgpu::BufferUsage::Uniform | wgpu::BufferUsage::Vertex, {"Waylib Zero Buffer"});
 	}
 	return zeroBuffer;
@@ -794,16 +714,15 @@ result<gpu_buffer> gpu_buffer::zero_buffer(wgpu_state& state, size_t minimum_siz
 //////////////////////////////////////////////////////////////////////
 
 
-result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
+wgpu::BindGroup Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
 	auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), minimum_utility_buffer_size, &draw);
-	if(!zeroBuffer) return unexpected(zeroBuffer.error());
 
 	std::array<WGPUBindGroupEntry, 1> entries = {
 		WGPUBindGroupEntry{
 			.binding = 0,
-			.buffer = zeroBuffer->gpu_data,
-			.offset = zeroBuffer->offset,
-			.size = zeroBuffer->size,
+			.buffer = zeroBuffer.gpu_data,
+			.offset = zeroBuffer.offset,
+			.size = zeroBuffer.size,
 		}
 	};
 	if(draw.utility_buffer) {
@@ -819,7 +738,7 @@ result<wgpu::BindGroup> Gbuffer::bind_group(struct drawing_state& draw, struct m
 	});
 }
 
-result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) WAYLIB_TRY {
+drawing_state Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	drawing_stateC out {.state = &state, .gbuffer = this};
 	// static frame_finalizers finalizers;
 
@@ -882,7 +801,7 @@ result<drawing_state> Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(
 
 	if(utility_buffer) out.utility_buffer = static_cast<gpu_bufferC*>(&utility_buffer.value);
 	return {{std::move(out)}};
-} WAYLIB_CATCH
+}
 
 
 //////////////////////////////////////////////////////////////////////

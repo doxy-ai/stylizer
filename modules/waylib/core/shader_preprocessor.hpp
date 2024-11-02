@@ -6,6 +6,7 @@
 #include <set>
 #include <fstream>
 #include <algorithm>
+#include <stdexcept>
 #include <filesystem>
 #include <unordered_map>
 
@@ -48,9 +49,9 @@ namespace wgsl_preprocess {
 			return data;
 		}
 
-		inline wl::result<std::string> read_entire_file(std::filesystem::path path, bool support_pragma_once) {
+		inline std::string read_entire_file(std::filesystem::path path, bool support_pragma_once) {
 			std::ifstream fin(path);
-			if(!fin) return wl::unexpected("Failed to open file `" + path.string() + "`... does it exist?");
+			if(!fin) throw std::runtime_error("Failed to open file `" + path.string() + "`... does it exist?");
 
 			fin.seekg(0, std::ios::end);
 			size_t size = fin.tellg();
@@ -84,82 +85,67 @@ namespace wgsl_preprocess {
 			return out;
 		}
 
-		wl::result<std::string> process_from_memory(std::string_view data_, const config& config) {
+		std::string process_from_memory(std::string_view data_, const config& config) {
 			struct PreprocessFailed { std::string what; };
 
 			auto data = std::make_unique<tcpp::StringInputStream>(defines_string() + std::string(data_) + "\n");
 			tcpp::Lexer lexer(std::move(data));
-			try {
-				tcpp::Preprocessor preprocessor(lexer, {[](const tcpp::TErrorInfo& info){
-					auto error = tcpp::ErrorTypeToString(info.mType);
-					if (error.empty()) error = "Unknown error";
-					error += " on line: " + std::to_string(info.mLine);
-					// TODO: Include that line of the input!
-					throw PreprocessFailed{error};
-				}, [&](const std::string& path_, bool isSystem) -> tcpp::TInputStreamUniquePtr{
-					std::filesystem::path path = path_;
-					if(file_cache.find(path) != file_cache.end())
-						return std::make_unique<tcpp::StringInputStream>(file_cache[path]);
+			tcpp::Preprocessor preprocessor(lexer, {[](const tcpp::TErrorInfo& info){
+				auto error = tcpp::ErrorTypeToString(info.mType);
+				if (error.empty()) error = "Unknown error";
+				error += " on line: " + std::to_string(info.mLine);
+				// TODO: Include that line of the input!
+				throw PreprocessFailed{error};
+			}, [&](const std::string& path_, bool isSystem) -> tcpp::TInputStreamUniquePtr{
+				std::filesystem::path path = path_;
+				if(file_cache.find(path) != file_cache.end())
+					return std::make_unique<tcpp::StringInputStream>(file_cache[path]);
 
-					#define SHADER_PREPROCESSOR_NON_SYSTEM_PATHS {\
-						if(config.path) {\
-							auto relativeToConfig = std::filesystem::absolute(std::filesystem::path(config.path).parent_path() / path);\
-							if(std::filesystem::exists(relativeToConfig)){\
-								if(auto res = detail::read_entire_file(relativeToConfig, config.support_pragma_once); res)\
-									return std::make_unique<tcpp::StringInputStream>(*res);\
-								else throw PreprocessFailed{res.error()};\
-							}\
-						}\
-						auto absolute = std::filesystem::absolute(path);\
-						if(std::filesystem::exists(absolute)) {\
-							if(auto res = detail::read_entire_file(absolute, config.support_pragma_once); res)\
-								return std::make_unique<tcpp::StringInputStream>(*res);\
-							else throw PreprocessFailed{res.error()};\
-						}\
-					}
-					if(!isSystem) SHADER_PREPROCESSOR_NON_SYSTEM_PATHS
+				#define SHADER_PREPROCESSOR_NON_SYSTEM_PATHS {\
+					if(config.path) {\
+						auto relativeToConfig = std::filesystem::absolute(std::filesystem::path(config.path).parent_path() / path);\
+						if(std::filesystem::exists(relativeToConfig))\
+							return std::make_unique<tcpp::StringInputStream>(detail::read_entire_file(relativeToConfig, config.support_pragma_once));\
+					}\
+					auto absolute = std::filesystem::absolute(path);\
+					if(std::filesystem::exists(absolute))\
+						return std::make_unique<tcpp::StringInputStream>(detail::read_entire_file(absolute, config.support_pragma_once));\
+				}
+				if(!isSystem) SHADER_PREPROCESSOR_NON_SYSTEM_PATHS
 
-					for(auto system: search_paths) {
-						system = system / path;
-						if(std::filesystem::exists(system)) {
-							if(auto res = detail::read_entire_file(system, config.support_pragma_once); res)
-								return std::make_unique<tcpp::StringInputStream>(*res);
-							else throw PreprocessFailed{res.error()};
-						}
-					}
+				for(auto system: search_paths) {
+					system = system / path;
+					if(std::filesystem::exists(system))
+						return std::make_unique<tcpp::StringInputStream>(detail::read_entire_file(system, config.support_pragma_once));
+				}
 
-					if(isSystem) SHADER_PREPROCESSOR_NON_SYSTEM_PATHS
-					#undef SHADER_PREPROCESSOR_NON_SYSTEM_PATHS
+				if(isSystem) SHADER_PREPROCESSOR_NON_SYSTEM_PATHS
+				#undef SHADER_PREPROCESSOR_NON_SYSTEM_PATHS
 
-					throw PreprocessFailed{"Included file `" + path.string() + "` could not be found!"};
-				}, config.remove_comments});
+				throw PreprocessFailed{"Included file `" + path.string() + "` could not be found!"};
+			}, config.remove_comments});
 
-				if(config.remove_whitespace) return detail::consolidate_whitespace(preprocessor.Process());
-				return preprocessor.Process();
-			} catch(PreprocessFailed fail) {
-				return wl::unexpected(fail.what);
-			}
+			if(config.remove_whitespace) return detail::consolidate_whitespace(preprocessor.Process());
+			return preprocessor.Process();
 		}
 
-		wl::result<std::string> process_from_memory_and_cache(const std::string& data_, const std::filesystem::path& path, config config) {
+		std::string process_from_memory_and_cache(const std::string& data_, const std::filesystem::path& path, config config) {
 			std::string data;
 			if(config.support_pragma_once) data = detail::process_pragma_once(data_, path);
 			else data = data_;
 
 			auto str = path.string(); config.path = str.c_str();
-			if(auto res = process_from_memory(data, config); res) {
-				file_cache[path] = data;
-				return *res;
-			} else return wl::unexpected(res.error());
+			auto res = process_from_memory(data, config);
+			file_cache[path] = data;
+			return res;
 		}
 
-		wl::result<std::string> process(const std::filesystem::path& path, const config& config) {
+		std::string process(const std::filesystem::path& path, const config& config) {
 			if(file_cache.find(path) != file_cache.end())
 				return file_cache[path];
 
 			auto data = detail::read_entire_file(path, config.support_pragma_once);
-			if(!data) return data;
-			return process_from_memory_and_cache(*data, path, config);
+			return process_from_memory_and_cache(data, path, config);
 		}
 
 		shader_preprocessor& add_define(std::string_view name, std::string_view value) {

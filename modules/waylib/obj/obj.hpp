@@ -9,7 +9,7 @@ WAYLIB_BEGIN_NAMESPACE
 	}
 
 	namespace obj {
-		result<model> load(const std::filesystem::path& file_path);
+		model load(const std::filesystem::path& file_path);
 	}
 
 WAYLIB_END_NAMESPACE

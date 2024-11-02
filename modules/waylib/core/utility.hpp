@@ -52,6 +52,10 @@ WAYLIB_BEGIN_NAMESPACE
 	struct exception: public std::runtime_error {
 		using std::runtime_error::runtime_error;
 	};
+
+	#define WAYLIB_THROW(x) throw exception(x)
+#else
+	#define WAYLIB_THROW(x) assert((x, false))
 #endif
 
 	template<typename T>

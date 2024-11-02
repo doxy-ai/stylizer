@@ -34,24 +34,23 @@ WAYLIB_BEGIN_NAMESPACE
 			return surface;
 		}
 
-		result<wgpu_state> create_default_state(bool prefer_low_power = false) WAYLIB_TRY {
+		wgpu_state create_default_state(bool prefer_low_power = false) {
 			auto partial = wgpu_state::create_default(nullptr, prefer_low_power);
-			if(!partial) return partial;
-			partial->surface = get_surface(partial->instance);
+			partial.surface = get_surface(partial.instance);
 			return partial;
-		} WAYLIB_CATCH
-
-		inline result<window*> configure_surface(wgpu_state& state, surface_configuration config = {}) const {
-			if(auto res = state.configure_surface(get_dimensions(), config); !res) return unexpected(res.error());
-			return const_cast<window*>(this);
 		}
 
-		result<window*> reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
+		inline window& configure_surface(wgpu_state& state, surface_configuration config = {}) const {
+			state.configure_surface(get_dimensions(), config);
+			return *const_cast<window*>(this);
+		}
+
+		window& reconfigure_surface_on_resize(wgpu_state& state, surface_configuration config = {}) {
 			raw.sizeEvent.append([&state, config](glfw::Window&, int x, int y){
 				state.configure_surface({x, y}, config);
 			});
 			if(config.automatic_should_configure_now) return configure_surface(state, config);
-			return this;
+			return *this;
 		}
 
 		template<GbufferProvider Tgbuffer>
@@ -62,23 +61,23 @@ WAYLIB_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		result<window*> present(wgpu_state& state, releasable auto... releases) WAYLIB_TRY {
+		window& present(wgpu_state& state, releasable auto... releases) {
 		#ifndef __EMSCRIPTEN__
 			surface.present();
 		#endif
 			(releases.release(), ...);
-			return this;
-		} WAYLIB_CATCH
+			return *this;
+		}
 
-		result<window*> present(wgpu_state& state, texture& texture, releasable auto... releases) {
+		window& present(wgpu_state& state, texture& texture, releasable auto... releases) {
 			auto oldSurface = state.surface; state.surface = this->surface;
-			auto surfaceTexture = state.current_surface_texture(); if(!surfaceTexture) return unexpected(surfaceTexture.error());
-			result<drawing_state> blit = drawing_state{};
-			if(surfaceTexture->size() == texture.size()) {
-				if(auto res = surfaceTexture->copy(state, texture); !res) return unexpected(res.error());
-			} else if(blit = texture.blit_to(state, *surfaceTexture); !blit) return unexpected(blit.error());
+			auto surfaceTexture = state.current_surface_texture();
+			drawing_state blit; blit.zero();
+			if(surfaceTexture.size() == texture.size())
+				surfaceTexture.copy(state, texture);
+			else blit = texture.blit_to(state, surfaceTexture);
 			state.surface = oldSurface;
-			return present(state, releases..., *blit, *surfaceTexture);
+			return present(state, releases..., blit, surfaceTexture);
 		}
 
 	};
