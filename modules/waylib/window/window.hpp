@@ -1,12 +1,11 @@
 #pragma once
 
-#include "glfwpp/event.h"
 #include "waylib/core/core.hpp"
 
 #include <glfwpp/glfwpp.h>
 #include <glfw3webgpu.h>
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 	extern "C" {
 		#include "window.h"
@@ -16,7 +15,7 @@ WAYLIB_BEGIN_NAMESPACE
 		glfw::Window raw;
 		wgpu::Surface surface = nullptr;
 
-		static struct window create(vec2u size, std::string_view name = "Waylib", window_config config = {});
+		static struct window create(vec2u size, std::string_view name = "Stylizer", window_config config = {});
 
 		inline bool should_close(bool poll_events = true) const {
 			if(poll_events) glfw::pollEvents();
@@ -89,4 +88,4 @@ WAYLIB_BEGIN_NAMESPACE
 		auto_release(window&& o) : window(std::move(o)) {}
 	};
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(waylib CXX C)
+project(stylizer CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -17,12 +17,12 @@ add_subdirectory(modules/waylib/img)
 add_subdirectory(modules/waylib/obj)
 add_subdirectory(modules/waylib/window)
 
-add_executable(waylib_tests test.cpp)
-target_link_libraries(waylib_tests PUBLIC waylib::core waylib::img waylib::obj waylib::window)
+add_executable(stylizer_tests test.cpp)
+target_link_libraries(stylizer_tests PUBLIC stylizer::core stylizer::img stylizer::obj stylizer::window)
 
 if(EMSCRIPTEN)
-	set_target_properties(waylib_tests PROPERTIES SUFFIX ".html")
-	target_link_options(waylib_tests PUBLIC
+	set_target_properties(stylizer_tests PROPERTIES SUFFIX ".html")
+	target_link_options(stylizer_tests PUBLIC
 		# -fexceptions
 		# -sALLOW_MEMORY_GROWTH
 		--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/resources@resources

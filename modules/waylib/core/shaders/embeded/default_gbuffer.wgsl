@@ -1,9 +1,9 @@
 #pragma once
 
-#include <waylib/mesh_data>
-#include <waylib/utility_data>
-#include <waylib/vertex_data>
-#include <waylib/default_gbuffer_data>
+#include <stylizer/mesh_data>
+#include <stylizer/utility_data>
+#include <stylizer/vertex_data>
+#include <stylizer/default_gbuffer_data>
 
 @group(0) @binding(0) var<storage, read> utility : utility_data;
 

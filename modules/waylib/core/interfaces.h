@@ -1,7 +1,6 @@
-#ifndef WAYLIB_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
-#define WAYLIB_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
+#ifndef STYLIZER_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
+#define STYLIZER_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
 
-#include "waylib/core/optional.h"
 #ifndef __cplusplus
 	#include "config.h"
 	#include "optional.h"
@@ -16,25 +15,25 @@
 // # Math
 //////////////////////////////////////////////////////////////////////
 
-#ifndef WAYLIB_NO_SCALAR_ALIASES
-	typedef uint8_t WAYLIB_PREFIXED(u8);
-	typedef uint16_t WAYLIB_PREFIXED(u16);
-	typedef uint32_t WAYLIB_PREFIXED(u32);
-	typedef uint64_t WAYLIB_PREFIXED(u64);
-	typedef int8_t WAYLIB_PREFIXED(i8);
-	typedef int16_t WAYLIB_PREFIXED(i16);
-	typedef int32_t WAYLIB_PREFIXED(i32);
-	typedef int64_t WAYLIB_PREFIXED(i64);
-	typedef float WAYLIB_PREFIXED(f32);
-	typedef double WAYLIB_PREFIXED(f64);
+#ifndef STYLIZER_NO_SCALAR_ALIASES
+	typedef uint8_t STYLIZER_PREFIXED(u8);
+	typedef uint16_t STYLIZER_PREFIXED(u16);
+	typedef uint32_t STYLIZER_PREFIXED(u32);
+	typedef uint64_t STYLIZER_PREFIXED(u64);
+	typedef int8_t STYLIZER_PREFIXED(i8);
+	typedef int16_t STYLIZER_PREFIXED(i16);
+	typedef int32_t STYLIZER_PREFIXED(i32);
+	typedef int64_t STYLIZER_PREFIXED(i64);
+	typedef float STYLIZER_PREFIXED(f32);
+	typedef double STYLIZER_PREFIXED(f64);
 #endif
 
-typedef uint32_t WAYLIB_PREFIXED(bool32);
-typedef uint32_t WAYLIB_PREFIXED(index_t);
+typedef uint32_t STYLIZER_PREFIXED(bool32);
+typedef uint32_t STYLIZER_PREFIXED(index_t);
 
 typedef struct {
 	uint32_t x, y;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec2u, vec2uC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec2u, vec2uC);
 
 #ifdef __cplusplus
 	inline vec2uC& toC(const vec2u& v) { return *(vec2uC*)&v; }
@@ -43,7 +42,7 @@ typedef struct {
 
 typedef struct {
 	int32_t x, y;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec2i, vec2iC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec2i, vec2iC);
 
 #ifdef __cplusplus
 	inline vec2iC& toC(const vec2i& v) { return *(vec2iC*)&v; }
@@ -52,7 +51,7 @@ typedef struct {
 
 typedef struct {
 	float x, y;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec2f, vec2fC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec2f, vec2fC);
 
 #ifdef __cplusplus
 	inline vec2fC& toC(const vec2f& v) { return *(vec2fC*)&v; }
@@ -61,7 +60,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t x, y, z;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec3u, vec3uC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec3u, vec3uC);
 
 #ifdef __cplusplus
 	inline vec3uC& toC(const vec3u& v) { return *(vec3uC*)&v; }
@@ -70,7 +69,7 @@ typedef struct {
 
 typedef struct {
 	int32_t x, y, z;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec3i, vec3iC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec3i, vec3iC);
 
 #ifdef __cplusplus
 	inline vec3iC& toC(const vec3i& v) { return *(vec3iC*)&v; }
@@ -79,7 +78,7 @@ typedef struct {
 
 typedef struct {
 	float x, y, z;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec3f, vec3fC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec3f, vec3fC);
 
 #ifdef __cplusplus
 	inline vec3fC& toC(const vec3f& v) { return *(vec3fC*)&v; }
@@ -88,7 +87,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t x, y, z, w;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec4u, vec4uC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec4u, vec4uC);
 
 #ifdef __cplusplus
 	inline vec4uC& toC(const vec4u& v) { return *(vec4uC*)&v; }
@@ -97,7 +96,7 @@ typedef struct {
 
 typedef struct {
 	int32_t x, y, z, w;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec4i, vec4iC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec4i, vec4iC);
 
 #ifdef __cplusplus
 	inline vec4iC& toC(const vec4i& v) { return *(vec4iC*)&v; }
@@ -106,14 +105,14 @@ typedef struct {
 
 typedef struct {
 	float x, y, z, w;
-} WAYLIB_PREFIXED_C_CPP_TYPE(vec4f, vec4fC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(vec4f, vec4fC);
 
 #ifdef __cplusplus
 	inline vec4fC& toC(const vec4f& v) { return *(vec4fC*)&v; }
 	inline vec4f& fromC(const vec4fC& v) { return *(vec4f*)&v; }
 #endif
 
-typedef WAYLIB_PREFIXED_C_CPP_TYPE(vec4f, vec4fC) WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC);
+typedef STYLIZER_PREFIXED_C_CPP_TYPE(vec4f, vec4fC) STYLIZER_PREFIXED_C_CPP_TYPE(color, colorC);
 
 #ifdef __cplusplus
 	inline WGPUColor toWGPU(const colorC& c) { return {c.x, c.y, c.z, c.w}; }
@@ -121,7 +120,7 @@ typedef WAYLIB_PREFIXED_C_CPP_TYPE(vec4f, vec4fC) WAYLIB_PREFIXED_C_CPP_TYPE(col
 
 typedef struct {
 	uint8_t r, g, b, a;
-} WAYLIB_PREFIXED_C_CPP_TYPE(color8, color8C);
+} STYLIZER_PREFIXED_C_CPP_TYPE(color8, color8C);
 
 #ifdef __cplusplus
 	inline WGPUColor toWGPU(const color8C& c) { return {c.r / 255.0f, c.g / 255.0f, c.b / 255.0f, c.a / 255.0f}; }
@@ -132,7 +131,7 @@ typedef struct {
 	float m1, m5, m9, m13;      // Matrix second row (4 components)
 	float m2, m6, m10, m14;     // Matrix third row (4 components)
 	float m3, m7, m11, m15;     // Matrix fourth row (4 components)
-} WAYLIB_PREFIXED_C_CPP_TYPE(mat4x4f, mat4x4fC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(mat4x4f, mat4x4fC);
 
 #ifdef __cplusplus
 	inline mat4x4fC& toC(const mat4x4f& mat) { return *(mat4x4fC*)&mat; }
@@ -145,9 +144,9 @@ typedef struct {
 //////////////////////////////////////////////////////////////////////
 
 
-struct WAYLIB_PREFIXED(window);
-struct WAYLIB_PREFIXED(shader_preprocessor);
-struct WAYLIB_PREFIXED(finalizer_list);
+struct STYLIZER_PREFIXED(window);
+struct STYLIZER_PREFIXED(shader_preprocessor);
+struct STYLIZER_PREFIXED(finalizer_list);
 
 
 //////////////////////////////////////////////////////////////////////
@@ -157,21 +156,21 @@ struct WAYLIB_PREFIXED(finalizer_list);
 
 // WGPU State
 typedef struct {
-	WAYLIB_C_OR_CPP_TYPE(WGPUInstance, wgpu::Instance) instance;
-	WAYLIB_C_OR_CPP_TYPE(WGPUAdapter, wgpu::Adapter) adapter;
-	WAYLIB_C_OR_CPP_TYPE(WGPUDevice, wgpu::Device) device;
-	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUSurface, wgpu::Surface)) surface
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_C_OR_CPP_TYPE(WGPUInstance, wgpu::Instance) instance;
+	STYLIZER_C_OR_CPP_TYPE(WGPUAdapter, wgpu::Adapter) adapter;
+	STYLIZER_C_OR_CPP_TYPE(WGPUDevice, wgpu::Device) device;
+	STYLIZER_NULLABLE(STYLIZER_C_OR_CPP_TYPE(WGPUSurface, wgpu::Surface)) surface
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; WAYLIB_C_OR_CPP_TYPE(WGPUTextureFormat, wgpu::TextureFormat) surface_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	; STYLIZER_C_OR_CPP_TYPE(WGPUTextureFormat, wgpu::TextureFormat) surface_format
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureFormat::Undefined
 #endif
 	;
-} WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC);
 
-WAYLIB_ENUM image_format {
+STYLIZER_ENUM image_format {
 	C_PREPEND(IMAGE_FORMAT_, Invalid) = 0,
 	C_PREPEND(IMAGE_FORMAT_, RGBA),
 	C_PREPEND(IMAGE_FORMAT_, RGBA8),
@@ -184,107 +183,107 @@ WAYLIB_ENUM image_format {
 typedef struct {
 	image_format format;
 	union {
-		WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC)*) rgba;
-		WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(color8, color8C)*) rgba8;
-		WAYLIB_MANAGEABLE(float*) gray;
-		WAYLIB_MANAGEABLE(uint8_t*) gray8;
-		WAYLIB_MANAGEABLE(void*) data
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+		STYLIZER_MANAGEABLE(STYLIZER_PREFIXED_C_CPP_TYPE(color, colorC)*) rgba;
+		STYLIZER_MANAGEABLE(STYLIZER_PREFIXED_C_CPP_TYPE(color8, color8C)*) rgba8;
+		STYLIZER_MANAGEABLE(float*) gray;
+		STYLIZER_MANAGEABLE(uint8_t*) gray8;
+		STYLIZER_MANAGEABLE(void*) data
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 			= nullptr
 #endif
 		;
 	};
-	WAYLIB_PREFIXED(vec2u) size;
+	STYLIZER_PREFIXED(vec2u) size;
 	size_t frames;
-} WAYLIB_PREFIXED_C_CPP_TYPE(image, imageC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(image, imageC);
 
 // Texture (GPU texture data)
 typedef struct {
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(image, imageC)*)) cpu_data;
-	WAYLIB_C_OR_CPP_TYPE(WGPUTexture, wgpu::Texture) gpu_data;
-	WAYLIB_C_OR_CPP_TYPE(WGPUTextureView, wgpu::TextureView) view;
-	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUSampler, wgpu::Sampler)) sampler
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(image, imageC)*)) cpu_data;
+	STYLIZER_C_OR_CPP_TYPE(WGPUTexture, wgpu::Texture) gpu_data;
+	STYLIZER_C_OR_CPP_TYPE(WGPUTextureView, wgpu::TextureView) view;
+	STYLIZER_NULLABLE(STYLIZER_C_OR_CPP_TYPE(WGPUSampler, wgpu::Sampler)) sampler
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
 	;
-} WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(texture, textureC);
 
 // General Purpose GPU Buffer
 typedef struct gpu_bufferC {
 	size_t size;
 	size_t offset;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(uint8_t*)) cpu_data;
-	WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) gpu_data;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) label;
-} WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC);
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(uint8_t*)) cpu_data;
+	STYLIZER_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) gpu_data;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(const char*)) label;
+} STYLIZER_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC);
 
-// Gbuffer
-typedef struct WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC) {
-	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) previous;
-	WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC) color, depth, normal;
-} WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC);
+// Geometry Buffer
+typedef struct STYLIZER_PREFIXED_C_CPP_TYPE(geometry_buffer, geometry_bufferC) {
+	STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(geometry_buffer, geometry_bufferC)*) previous;
+	STYLIZER_PREFIXED_C_CPP_TYPE(texture, textureC) color, depth, normal;
+} STYLIZER_PREFIXED_C_CPP_TYPE(geometry_buffer, geometry_bufferC);
 
 // Drawing State
 typedef struct {
-	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state;
-	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) gbuffer;
-	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*) utility_buffer;
-	WAYLIB_C_OR_CPP_TYPE(WGPUCommandEncoder, wgpu::CommandEncoder) pre_encoder, render_encoder;
-	WAYLIB_C_OR_CPP_TYPE(WGPURenderPassEncoder, wgpu::RenderPassEncoder) render_pass;
-	WAYLIB_PREFIXED(finalizer_list)* finalizers;
-} WAYLIB_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC);
+	STYLIZER_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state;
+	STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(geometry_buffer, geometry_bufferC)*) gbuffer;
+	STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*) utility_buffer;
+	STYLIZER_C_OR_CPP_TYPE(WGPUCommandEncoder, wgpu::CommandEncoder) pre_encoder, render_encoder;
+	STYLIZER_C_OR_CPP_TYPE(WGPURenderPassEncoder, wgpu::RenderPassEncoder) render_pass;
+	STYLIZER_PREFIXED(finalizer_list)* finalizers;
+} STYLIZER_PREFIXED_C_CPP_TYPE(drawing_state, drawing_stateC);
 
 // Shader
 typedef struct {
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) compute_entry_point;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) vertex_entry_point;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(const char*)) fragment_entry_point;
-	WAYLIB_C_OR_CPP_TYPE(WGPUShaderModule, wgpu::ShaderModule) module;
-} WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC);
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(const char*)) compute_entry_point;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(const char*)) vertex_entry_point;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(const char*)) fragment_entry_point;
+	STYLIZER_C_OR_CPP_TYPE(WGPUShaderModule, wgpu::ShaderModule) module;
+} STYLIZER_PREFIXED_C_CPP_TYPE(shader, shaderC);
 
 // Computer
 typedef struct {
 	index_t buffer_count;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
 	index_t texture_count;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)*)) textures;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(texture, textureC)*)) textures;
 
-	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC)*) shader;
-	WAYLIB_C_OR_CPP_TYPE(WGPUComputePipeline, wgpu::ComputePipeline) pipeline;
-} WAYLIB_PREFIXED_C_CPP_TYPE(computer, computerC);
+	STYLIZER_MANAGEABLE(STYLIZER_PREFIXED_C_CPP_TYPE(shader, shaderC)*) shader;
+	STYLIZER_C_OR_CPP_TYPE(WGPUComputePipeline, wgpu::ComputePipeline) pipeline;
+} STYLIZER_PREFIXED_C_CPP_TYPE(computer, computerC);
 
 // Material
 typedef struct {
 	index_t buffer_count;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(gpu_buffer, gpu_bufferC)*)) buffers;
 	index_t texture_count;
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(texture, textureC)*)) textures;
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(texture, textureC)*)) textures;
 
-	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(shader, shaderC)*) shaders;
-	WAYLIB_PREFIXED(index_t) shader_count;
-	WAYLIB_C_OR_CPP_TYPE(WGPURenderPipeline, wgpu::RenderPipeline) pipeline;
-	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUBindGroup, wgpu::BindGroup)) bind_group;
-} WAYLIB_PREFIXED_C_CPP_TYPE(material, materialC);
+	STYLIZER_MANAGEABLE(STYLIZER_PREFIXED_C_CPP_TYPE(shader, shaderC)*) shaders;
+	STYLIZER_PREFIXED(index_t) shader_count;
+	STYLIZER_C_OR_CPP_TYPE(WGPURenderPipeline, wgpu::RenderPipeline) pipeline;
+	STYLIZER_NULLABLE(STYLIZER_C_OR_CPP_TYPE(WGPUBindGroup, wgpu::BindGroup)) bind_group;
+} STYLIZER_PREFIXED_C_CPP_TYPE(material, materialC);
 
 // Mesh, vertex data
 // From: raylib.h
 typedef struct {
-	WAYLIB_PREFIXED(index_t) triangle_count;	// Number of triangles stored (indexed or not)
-	WAYLIB_PREFIXED(index_t) vertex_count;		// Number of vertices stored (length of each of the following arrays)
+	STYLIZER_PREFIXED(index_t) triangle_count;	// Number of triangles stored (indexed or not)
+	STYLIZER_PREFIXED(index_t) vertex_count;		// Number of vertices stored (length of each of the following arrays)
 
 	// Vertex attributes data
-	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED(vec4f)*) positions;						// Vertex position (xyz) mask 1 (w) (shader-location = 0) NOTE: Not nullable
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) normals;		// Vertex normals (xyz) mask 2 (w) (shader-location = 1)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) tangents;		// Vertex tangents (xyz) and sign (w) to compute bitangent (shader-location = 2)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) uvs;			// Vertex texture coordinates (xy) and (zw) (shader-location = 3)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) cta;			// Vertex curvature (x), thickness (y), and associated faces begin (z) and length (z) (shader-location = 4)
+	STYLIZER_MANAGEABLE(STYLIZER_PREFIXED(vec4f)*) positions;						// Vertex position (xyz) mask 1 (w) (shader-location = 0) NOTE: Not nullable
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(vec4f)*)) normals;		// Vertex normals (xyz) mask 2 (w) (shader-location = 1)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(vec4f)*)) tangents;		// Vertex tangents (xyz) and sign (w) to compute bitangent (shader-location = 2)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(vec4f)*)) uvs;			// Vertex texture coordinates (xy) and (zw) (shader-location = 3)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(vec4f)*)) cta;			// Vertex curvature (x), thickness (y), and associated faces begin (z) and length (z) (shader-location = 4)
 
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC))*)) colors;		// Vertex colors (shader-location = 5)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4u)*)) bones;			// Bone IDs (shader-location = 6)
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(vec4f)*)) bone_weights;	// Bone weights associated with each ID (shader-location = 7)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(STYLIZER_PREFIXED_C_CPP_TYPE(color, colorC))*)) colors;		// Vertex colors (shader-location = 5)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(vec4u)*)) bones;			// Bone IDs (shader-location = 6)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(vec4f)*)) bone_weights;	// Bone weights associated with each ID (shader-location = 7)
 
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(index_t)*)) indices;		// Vertex indices (in case vertex data comes indexed)
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(index_t)*)) indices;		// Vertex indices (in case vertex data comes indexed)
 
 
 	// Animation vertex data
@@ -293,25 +292,25 @@ typedef struct {
 	// vec4u* bone_ids;			// Vertex bone ids, max 255 bone ids, up to 4 bones influence by vertex (skinning)
 	// vec4f* bone_weights;		// Vertex bone weight, up to 4 bones influence by vertex (skinning)
 
-	WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) vertex_buffer, transformed_vertex_buffer; // Pointer to the data on the gpu
-	WAYLIB_NULLABLE(WAYLIB_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer)) index_buffer, transformed_index_buffer; // Pointer to the index data on the gpu
-} WAYLIB_PREFIXED_C_CPP_TYPE(mesh, meshC);
+	STYLIZER_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer) vertex_buffer, transformed_vertex_buffer; // Pointer to the data on the gpu
+	STYLIZER_NULLABLE(STYLIZER_C_OR_CPP_TYPE(WGPUBuffer, wgpu::Buffer)) index_buffer, transformed_index_buffer; // Pointer to the index data on the gpu
+} STYLIZER_PREFIXED_C_CPP_TYPE(mesh, meshC);
 
 // Model, meshes, materials and animation data
 // From: raylib.h
 typedef struct {
-	WAYLIB_PREFIXED(mat4x4f) transform;			// Local transform matrix
+	STYLIZER_PREFIXED(mat4x4f) transform;			// Local transform matrix
 
-	WAYLIB_PREFIXED(index_t) mesh_count;											// Number of meshes
-	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(mesh, meshC)*) meshes;				// Meshes array
-	WAYLIB_PREFIXED(index_t) material_count;										// Number of materials
-	WAYLIB_MANAGEABLE(WAYLIB_PREFIXED_C_CPP_TYPE(material, materialC)*) materials;	// Materials array
-	WAYLIB_MANAGEABLE(WAYLIB_NULLABLE(WAYLIB_PREFIXED(index_t)*)) mesh_materials;	// Mesh to material mapping (when null and )
+	STYLIZER_PREFIXED(index_t) mesh_count;											// Number of meshes
+	STYLIZER_MANAGEABLE(STYLIZER_PREFIXED_C_CPP_TYPE(mesh, meshC)*) meshes;				// Meshes array
+	STYLIZER_PREFIXED(index_t) material_count;										// Number of materials
+	STYLIZER_MANAGEABLE(STYLIZER_PREFIXED_C_CPP_TYPE(material, materialC)*) materials;	// Materials array
+	STYLIZER_MANAGEABLE(STYLIZER_NULLABLE(STYLIZER_PREFIXED(index_t)*)) mesh_materials;	// Mesh to material mapping (when null and )
 
 	// Animation data
-	// WAYLIB_PREFIXED(index_t) bone_count;			// Number of bones
+	// STYLIZER_PREFIXED(index_t) bone_count;			// Number of bones
 	// bone_info* bones;			// Bones information (skeleton)
-} WAYLIB_PREFIXED_C_CPP_TYPE(model, modelC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(model, modelC);
 
 // Model Instance Data
 
@@ -340,62 +339,62 @@ typedef struct {
 	uint32_t bone_weights_start;
 
 	uint32_t vertex_buffer_size;
-} WAYLIB_PREFIXED(mesh_metadata);
+} STYLIZER_PREFIXED(mesh_metadata);
 
 typedef struct {
 	float since_start // at byte offset 0
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= 0
 #endif
 	; float delta; // at byte offset 4
 	float average_delta; // at byte offset 8
 	float _pad0;
-} WAYLIB_PREFIXED_C_CPP_TYPE(time, timeC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(time, timeC);
 
 typedef struct {
-	WAYLIB_PREFIXED(mat4x4f) view_matrix; // at byte offset 0
-	WAYLIB_PREFIXED(mat4x4f) projection_matrix; // at byte offset 64
-	WAYLIB_PREFIXED(vec3f) position; // at byte offset 128
+	STYLIZER_PREFIXED(mat4x4f) view_matrix; // at byte offset 0
+	STYLIZER_PREFIXED(mat4x4f) projection_matrix; // at byte offset 64
+	STYLIZER_PREFIXED(vec3f) position; // at byte offset 128
 	float _pad0;
-	WAYLIB_PREFIXED(vec3f) target_position; // at byte offset 144
+	STYLIZER_PREFIXED(vec3f) target_position; // at byte offset 144
 	float _pad1;
-	WAYLIB_PREFIXED(vec3f) up // at byte offset 160
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_PREFIXED(vec3f) up // at byte offset 160
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= {0, 1, 0}
 #endif
 	; float field_of_view // at byte offset 172
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= 90
 #endif
 	; float near_clip_distance // at byte offset 176
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= .01
 #endif
 	; float far_clip_distance // at byte offset 180
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= 1000
 #endif
 	; uint32_t orthographic; // at byte offset 184
 	float _pad2;
-} WAYLIB_PREFIXED_C_CPP_TYPE(camera3D, camera3DC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(camera3D, camera3DC);
 
 typedef struct {
-	WAYLIB_PREFIXED(mat4x4f) view_matrix; // at byte offset 0
-	WAYLIB_PREFIXED(mat4x4f) projection_matrix; // at byte offset 64
-	WAYLIB_PREFIXED(vec3f) offset; // at byte offset 128
+	STYLIZER_PREFIXED(mat4x4f) view_matrix; // at byte offset 0
+	STYLIZER_PREFIXED(mat4x4f) projection_matrix; // at byte offset 64
+	STYLIZER_PREFIXED(vec3f) offset; // at byte offset 128
 	float _pad0;
-	WAYLIB_PREFIXED(vec3f) target_position; // at byte offset 144
+	STYLIZER_PREFIXED(vec3f) target_position; // at byte offset 144
 	float rotation; // at byte offset 156
 	float near_clip_distance // at byte offset 160
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= .01
 #endif
 	; float far_clip_distance // at byte offset 164
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= 10
 #endif
 	; float zoom // at byte offset 168
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= 1
 #endif
 	; uint32_t pixel_perfect; // at byte offset 172
@@ -403,9 +402,9 @@ typedef struct {
 	uint32_t padding1; // at byte offset 180
 	uint32_t padding2; // at byte offset 184
 	float _pad1;
-} WAYLIB_PREFIXED_C_CPP_TYPE(camera2D, camera2DC);
+} STYLIZER_PREFIXED_C_CPP_TYPE(camera2D, camera2DC);
 
-WAYLIB_ENUM light_type {
+STYLIZER_ENUM light_type {
 	C_PREPEND(LIGHT_TYPE_, Ambient) = 0,
 	C_PREPEND(LIGHT_TYPE_, Directional),
 	C_PREPEND(LIGHT_TYPE_, Point),
@@ -420,21 +419,21 @@ typedef struct {
 	float cutoff_end_angle; // at byte offset 12
 	float falloff; // at byte offset 16
 	float _pad0[3];
-	WAYLIB_PREFIXED(vec3f) position; // at byte offset 32
+	STYLIZER_PREFIXED(vec3f) position; // at byte offset 32
 	float _pad1;
-	WAYLIB_PREFIXED(vec3f) direction; // at byte offset 48
+	STYLIZER_PREFIXED(vec3f) direction; // at byte offset 48
 	float _pad2;
-	WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC) color; // at byte offset 64
-} WAYLIB_PREFIXED_C_CPP_TYPE(light, lightC);
+	STYLIZER_PREFIXED_C_CPP_TYPE(color, colorC) color; // at byte offset 64
+} STYLIZER_PREFIXED_C_CPP_TYPE(light, lightC);
 
 typedef struct {
-	WAYLIB_PREFIXED(mat4x4f) transform;
-	WAYLIB_PREFIXED_C_CPP_TYPE(color, colorC) tint
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_PREFIXED(mat4x4f) transform;
+	STYLIZER_PREFIXED_C_CPP_TYPE(color, colorC) tint
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= {1, 1, 1, 1}
 #endif
 	;
-} WAYLIB_PREFIXED(model_instance);
+} STYLIZER_PREFIXED(model_instance);
 
 
 //////////////////////////////////////////////////////////////////////
@@ -443,134 +442,134 @@ typedef struct {
 
 
 typedef struct {
-	WAYLIB_OPTIONAL(WGPUPresentMode) presentation_mode
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_OPTIONAL(WGPUPresentMode) presentation_mode
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= {}
 #endif
 	; WGPUCompositeAlphaMode alpha_mode
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::CompositeAlphaMode::Auto
 #endif
 	; bool automatic_should_configure_now
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= true
 #endif
 	;
-} WAYLIB_PREFIXED(surface_configuration);
+} STYLIZER_PREFIXED(surface_configuration);
 
-WAYLIB_ENUM texture_create_sampler_type {
+STYLIZER_ENUM texture_create_sampler_type {
 	C_PREPEND(TEXTURE_CREATE_SAMPLER_TYPE_, None) = 0,
 	C_PREPEND(TEXTURE_CREATE_SAMPLER_TYPE_, Nearest),
 	C_PREPEND(TEXTURE_CREATE_SAMPLER_TYPE_, Trilinear),
 };
 
 typedef struct {
-	WAYLIB_OPTIONAL(WGPUTextureFormat) format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_OPTIONAL(WGPUTextureFormat) format
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= {}
 #endif
 	; WGPUTextureUsage usage
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureUsage::CopySrc | wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::TextureBinding
 #endif
 	; bool with_view
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= true
 #endif
 	; texture_create_sampler_type sampler_type
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= texture_create_sampler_type::Nearest
 #endif
 	; uint32_t mip_levels
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= 1
 #endif
 	; 
-} WAYLIB_PREFIXED(texture_create_configuation);
+} STYLIZER_PREFIXED(texture_create_configuation);
 
 typedef struct {
-	WAYLIB_NULLABLE(WAYLIB_PREFIXED_C_CPP_TYPE(Gbuffer, GbufferC)*) previous
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(geometry_buffer, geometry_bufferC)*) previous
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
 	; WGPUTextureFormat color_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureFormat::RGBA8Unorm
 #endif
 	; WGPUTextureFormat depth_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureFormat::Depth24Plus
 #endif
 	; WGPUTextureFormat normal_format
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::TextureFormat::RGBA16Float
 #endif
 	;
-} WAYLIB_PREFIXED(Gbuffer_config);
+} STYLIZER_PREFIXED(geometry_buffer_config);
 
 typedef struct {
 	bool remove_comments
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= false
 #endif
 	; bool remove_whitespace
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= false
 #endif
 	; bool support_pragma_once
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= true
 #endif
 	; const char* path
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
 	;
-} WAYLIB_PREFIXED(preprocess_shader_config);
+} STYLIZER_PREFIXED(preprocess_shader_config);
 
 typedef struct {
-	WAYLIB_NULLABLE(const char*) compute_entry_point
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	STYLIZER_NULLABLE(const char*) compute_entry_point
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; WAYLIB_NULLABLE(const char*) vertex_entry_point
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	; STYLIZER_NULLABLE(const char*) vertex_entry_point
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; WAYLIB_NULLABLE(const char*) fragment_entry_point
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	; STYLIZER_NULLABLE(const char*) fragment_entry_point
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; WAYLIB_NULLABLE(const char*) name
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	; STYLIZER_NULLABLE(const char*) name
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
-	; WAYLIB_NULLABLE(shader_preprocessor*) preprocessor
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	; STYLIZER_NULLABLE(shader_preprocessor*) preprocessor
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
 	; preprocess_shader_config preprocess_config
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= {}
 #endif
 	;
-} WAYLIB_PREFIXED(create_shader_configuration);
+} STYLIZER_PREFIXED(create_shader_configuration);
 
 typedef struct {
 	bool double_sided // Determines if the material should be culled from the back or if it should be visible from both sides
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= false
 #endif
-	; WAYLIB_OPTIONAL(WGPUCompareFunction) depth_function
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+	; STYLIZER_OPTIONAL(WGPUCompareFunction) depth_function
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= wgpu::CompareFunction::Less // Disables writing depth if not provided
 #endif
 	; // TODO: Add stencil support
 	shader_preprocessor* preprocessor
-#ifdef WAYLIB_ENABLE_DEFAULT_PARAMETERS
+#ifdef STYLIZER_ENABLE_DEFAULT_PARAMETERS
 		= nullptr
 #endif
 	;
-} WAYLIB_PREFIXED(material_configuration);
+} STYLIZER_PREFIXED(material_configuration);
 
-#endif // WAYLIB_INTERFACES_f9641d712fbea9630f1ce0a0613269d7
+#endif // STYLIZER_INTERFACES_f9641d712fbea9630f1ce0a0613269d7

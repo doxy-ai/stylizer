@@ -1,3 +1,3 @@
-add_library(waylib_obj obj.cpp)
-target_link_libraries(waylib_obj PUBLIC waylib::core)
-add_library(waylib::obj ALIAS waylib_obj)
+add_library(stylizer_obj obj.cpp)
+target_link_libraries(stylizer_obj PUBLIC stylizer::core)
+add_library(stylizer::obj ALIAS stylizer_obj)

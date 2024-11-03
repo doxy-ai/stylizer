@@ -2,7 +2,7 @@
 
 #include "waylib/core/core.hpp"
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 	extern "C" {
 		#include "obj.h"
@@ -12,4 +12,4 @@ WAYLIB_BEGIN_NAMESPACE
 		model load(const std::filesystem::path& file_path);
 	}
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

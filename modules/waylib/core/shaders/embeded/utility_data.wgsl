@@ -49,7 +49,7 @@ struct light_data {
 	quadratic: f32,
 };
 
-#ifdef WAYLIB_CAMERA_DATA_IS_3D
+#ifdef STYLIZER_CAMERA_DATA_IS_3D
 	struct utility_data {
 		time: frame_time_data,
 		camera: camera3D_data,

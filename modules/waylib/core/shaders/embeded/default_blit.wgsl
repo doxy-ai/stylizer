@@ -8,7 +8,7 @@ struct blit_vertex_output {
 @group(0) @binding(0) var texture: texture_2d<f32>;
 @group(0) @binding(1) var texture_sampler: sampler;
 
-#ifdef WAYLIB_BLIT_DEFAULT_VERTEX_ENTRY_POINT
+#ifdef STYLIZER_BLIT_DEFAULT_VERTEX_ENTRY_POINT
 @vertex
 fn vertex(@builtin(vertex_index) vertex_index: u32) -> blit_vertex_output
 #else

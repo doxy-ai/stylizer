@@ -3,7 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 	template<typename F>
 	image load_stb_image(const F& loader, bool hdr) {
 		image image;
@@ -11,7 +11,7 @@ WAYLIB_BEGIN_NAMESPACE
 		int channels;
 		image.data = {true, loader(&size.x, &size.y, &channels)};
 		if(*image.data == nullptr)
-			WAYLIB_THROW(stbi_failure_reason());
+			STYLIZER_THROW(stbi_failure_reason());
 
 		image.format = hdr ? image_format::RGBA : image_format::RGBA8;
 		image.size = size;
@@ -31,4 +31,4 @@ WAYLIB_BEGIN_NAMESPACE
 		else return load_stb_image([data](int* x, int* y, int* c) { return stbi_load_from_memory((stbi_uc*)data.data(), data.size(), x, y, c, 4); }, false);
 	}
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

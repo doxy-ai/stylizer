@@ -1,13 +1,13 @@
 #define TCPP_IMPLEMENTATION
 #define WEBGPU_CPP_IMPLEMENTATION
-#define IS_WAYLIB_CORE_CPP
+#define IS_STYLIZER_CORE_CPP
 #include "core.hpp"
 
 #include <battery/embed.hpp>
 #include <algorithm>
 #include <map>
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 //////////////////////////////////////////////////////////////////////
 // # Errors
@@ -16,7 +16,7 @@ WAYLIB_BEGIN_NAMESPACE
 
 	std::string errors::singleton;
 
-	WAYLIB_NULLABLE(const char*) get_error_message() {
+	STYLIZER_NULLABLE(const char*) get_error_message() {
 		return errors::get();
 	}
 
@@ -30,25 +30,25 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
-	WAYLIB_NULLABLE(WAYLIB_PREFIXED(thread_pool_future)*) WAYLIB_PREFIXED(thread_pool_enqueue)(
+	STYLIZER_NULLABLE(STYLIZER_PREFIXED(thread_pool_future)*) STYLIZER_PREFIXED(thread_pool_enqueue)(
 		void(*function)(),
 		bool return_future /*= false*/,
-		WAYLIB_OPTIONAL(size_t) initial_pool_size /*= {}*/
+		STYLIZER_OPTIONAL(size_t) initial_pool_size /*= {}*/
 	) {
-		auto future = WAYLIB_NAMESPACE::thread_pool::enqueue<void(*)()>(std::move(function), initial_pool_size);
+		auto future = STYLIZER_NAMESPACE::thread_pool::enqueue<void(*)()>(std::move(function), initial_pool_size);
 		if(!return_future) return nullptr;
-		return new WAYLIB_PREFIXED(thread_pool_future)(std::move(future));
+		return new STYLIZER_PREFIXED(thread_pool_future)(std::move(future));
 	}
 
-	void WAYLIB_PREFIXED(release_thread_pool_future)(
-		WAYLIB_PREFIXED(thread_pool_future)* future
+	void STYLIZER_PREFIXED(release_thread_pool_future)(
+		STYLIZER_PREFIXED(thread_pool_future)* future
 	) {
 		delete future;
 	}
 
-	void WAYLIB_PREFIXED(thread_pool_future_wait)(
-		WAYLIB_PREFIXED(thread_pool_future)* future,
-		WAYLIB_OPTIONAL(float) seconds_until_timeout /*= {}*/
+	void STYLIZER_PREFIXED(thread_pool_future_wait)(
+		STYLIZER_PREFIXED(thread_pool_future)* future,
+		STYLIZER_OPTIONAL(float) seconds_until_timeout /*= {}*/
 	) {
 		if(!seconds_until_timeout)
 			future->wait();
@@ -64,30 +64,30 @@ WAYLIB_BEGIN_NAMESPACE
 //////////////////////////////////////////////////////////////////////
 
 
-wgpu_state wgpu_state::default_from_instance(WGPUInstance instance_, WAYLIB_NULLABLE(WGPUSurface) surface_ /* = nullptr */, bool prefer_low_power /* = false */) {
+wgpu_state wgpu_state::default_from_instance(WGPUInstance instance_, STYLIZER_NULLABLE(WGPUSurface) surface_ /* = nullptr */, bool prefer_low_power /* = false */) {
 	wgpu::Instance instance = instance_; wgpu::Surface surface = surface_;
 
 	wgpu::Adapter adapter = instance.requestAdapter(WGPURequestAdapterOptions{
 		.compatibleSurface = surface,
 		.powerPreference = prefer_low_power ? wgpu::PowerPreference::LowPower : wgpu::PowerPreference::HighPerformance
 	});
-	if(!adapter) WAYLIB_THROW("Failed to find adapter.");
+	if(!adapter) STYLIZER_THROW("Failed to find adapter.");
 
 	WGPUFeatureName float32filterable = WGPUFeatureName_Float32Filterable;
 	wgpu::Device device = adapter.requestDevice(WGPUDeviceDescriptor{
-		.label = toWGPU("Waylib Device"),
+		.label = toWGPU("Stylizer Device"),
 		.requiredFeatureCount = 1,
 		.requiredFeatures = &float32filterable,
 		.requiredLimits = nullptr,
 		.defaultQueue = {
-			.label = toWGPU("Waylib Queue")
+			.label = toWGPU("Stylizer Queue")
 		},
 #ifdef __EMSCRIPTEN__
 		.deviceLostCallback = [](WGPUDeviceLostReason reason, char const* message, void* userdata) {
 			std::stringstream s;
 			s << "Device lost: reason " << wgpu::DeviceLostReason{reason};
 			if (message) s << " (" << message << ")";
-			WAYLIB_THROW(s.str());
+			STYLIZER_THROW(s.str());
 		},
 #else // __EMSCRIPTEN__
 		.deviceLostCallbackInfo = {
@@ -96,7 +96,7 @@ wgpu_state wgpu_state::default_from_instance(WGPUInstance instance_, WAYLIB_NULL
 				std::stringstream s;
 				s << "Device " << wgpu::Device{*device} << " lost: reason " << wgpu::DeviceLostReason{reason};
 				if (message.length) s << " (" << std::string_view{message.data, message.length} << ")";
-				WAYLIB_THROW(s.str());
+				STYLIZER_THROW(s.str());
 			}
 		},
 		.uncapturedErrorCallbackInfo = {
@@ -104,12 +104,12 @@ wgpu_state wgpu_state::default_from_instance(WGPUInstance instance_, WAYLIB_NULL
 				std::stringstream s;
 				s << "Uncaptured device error: type " << wgpu::ErrorType{type};
 				if (message.length) s << " (" << std::string_view{message.data, message.length} << ")";
-				WAYLIB_THROW(s.str());
+				STYLIZER_THROW(s.str());
 			}
 		}
 #endif // __EMSCRIPTEN__
 	});
-	if(!device) WAYLIB_THROW("Failed to create device.");
+	if(!device) STYLIZER_THROW("Failed to create device.");
 
 	return wgpu_stateC{instance, adapter, device, surface, wgpu::TextureFormat::Undefined};
 }
@@ -119,7 +119,7 @@ texture wgpu_state::current_surface_texture() {
 	surface.getCurrentTexture(&texture_);
 	if(texture_.status != wgpu::SurfaceGetCurrentTextureStatus::Success) {
 		std::stringstream s; s << "Texture error: " << wgpu::SurfaceGetCurrentTextureStatus{texture_.status};
-		WAYLIB_THROW(s.str());
+		STYLIZER_THROW(s.str());
 	}
 
 	texture out = textureC{.gpu_data = texture_.texture};
@@ -127,7 +127,7 @@ texture wgpu_state::current_surface_texture() {
 	return out;
 }
 
-drawing_state wgpu_state::begin_drawing_to_surface(WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */){
+drawing_state wgpu_state::begin_drawing_to_surface(STYLIZER_OPTIONAL(colorC) clear_color /* = {} */, STYLIZER_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */){
 	return current_surface_texture().begin_drawing(*this, clear_color, utility_buffer);
 }
 
@@ -493,7 +493,7 @@ texture& texture::generate_mipmaps(wgpu_state& state, uint32_t max_levels /* = 0
 
 	auto format = this->format();
 	auto formatStr = std::string(format_to_string(format));
-	wl::auto_release mipShader = shader::from_wgsl(state, R"_(
+	auto_release mipShader = shader::from_wgsl(state, R"_(
 @group(0) @binding(0) var previousMipLevel: texture_2d<f32>;
 @group(0) @binding(1) var nextMipLevel: texture_storage_2d<)_" + formatStr + R"_(, write>;
 
@@ -522,7 +522,7 @@ fn compute(@builtin(global_invocation_id) id: vec3<u32>) {
 		.textures = textures.data(),
 		.shader = &mipShader,
 	};
-	compute.upload(state, {"Waylib Mipmap Computer"});
+	compute.upload(state, {"Stylizer Mipmap Computer"});
 
 	// wgpu::Extent3D mipLevelSize = {size.x, size.y, 1}; // TOOD: do we need a tweak to properly handle cubemaps?
 	for (uint32_t level = 1; level < mip_levels; ++level) {
@@ -549,7 +549,7 @@ fn compute(@builtin(global_invocation_id) id: vec3<u32>) {
 	return *this;
 }
 
-drawing_state texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
+drawing_state texture::begin_drawing(wgpu_state& state, STYLIZER_OPTIONAL(colorC) clear_color /* = {} */, STYLIZER_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	static WGPUTextureViewDescriptor viewDesc = {
 		// .format = color.getFormat(),
 		.dimension = wgpu::TextureViewDimension::_2D,
@@ -575,9 +575,9 @@ drawing_state texture::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) 
 
 	// Create a command encoder for the draw call
 	wgpu::CommandEncoderDescriptor encoderDesc = {};
-	encoderDesc.label = toWGPU("Waylib Render Command Encoder");
+	encoderDesc.label = toWGPU("Stylizer Render Command Encoder");
 	out.render_encoder = state.device.createCommandEncoder(encoderDesc);
-	encoderDesc.label = toWGPU("Waylib Command Encoder");
+	encoderDesc.label = toWGPU("Stylizer Command Encoder");
 	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
 
 	static texture depthTexture = {};
@@ -704,13 +704,13 @@ fn fragment(vert: vertex_output) -> @location(0) vec4f {
 	return blit(draw, blitShader, false);
 }
 
-drawing_state texture::blit_to(wgpu_state& state, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
+drawing_state texture::blit_to(wgpu_state& state, texture& target, STYLIZER_OPTIONAL(colorC) clear_color /* = {} */, STYLIZER_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
 	blit(draw);
 	return draw.draw();
 }
 
-drawing_state texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
+drawing_state texture::blit_to(wgpu_state& state, shader& blit_shader, texture& target, STYLIZER_OPTIONAL(colorC) clear_color /* = {} */, STYLIZER_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	auto draw = target.begin_drawing(state, {clear_color ? *clear_color : colorC(0, 0, 0, 1)}, utility_buffer);
 	blit(draw, blit_shader);
 	return draw.draw();
@@ -730,18 +730,18 @@ gpu_buffer gpu_buffer::zero_buffer(wgpu_state& state, size_t minimum_size /* = 0
 		std::vector<std::byte> zeroData(zeroBuffer.size, std::byte{0});
 		if(zeroBuffer && !draw) zeroBuffer.release();
 		else if(zeroBuffer) draw->defer([gpu_data = zeroBuffer.gpu_data] { const_cast<wgpu::Buffer&>(gpu_data).release(); });
-		zeroBuffer = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage | wgpu::BufferUsage::Uniform | wgpu::BufferUsage::Vertex, {"Waylib Zero Buffer"});
+		zeroBuffer = gpu_buffer::create(state, zeroData, wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::Storage | wgpu::BufferUsage::Uniform | wgpu::BufferUsage::Vertex, {"Stylizer Zero Buffer"});
 	}
 	return zeroBuffer;
 }
 
 
 //////////////////////////////////////////////////////////////////////
-// # Gbuffer
+// # Geometry Buffer
 //////////////////////////////////////////////////////////////////////
 
 
-wgpu::BindGroup Gbuffer::bind_group(struct drawing_state& draw, struct material& mat) {
+wgpu::BindGroup geometry_buffer::bind_group(struct drawing_state& draw, struct material& mat) {
 	auto zeroBuffer = gpu_buffer::zero_buffer(draw.state(), minimum_utility_buffer_size, &draw);
 
 	std::array<WGPUBindGroupEntry, 1> entries = {
@@ -758,22 +758,22 @@ wgpu::BindGroup Gbuffer::bind_group(struct drawing_state& draw, struct material&
 		entries[0].size = draw.utility_buffer->size;
 	}
 	return draw.state().device.createBindGroup(WGPUBindGroupDescriptor{ // TODO: free when done somehow...
-		.label = toWGPU("Waylib Compute Texture Bind Group"),
+		.label = toWGPU("Stylizer Compute Texture Bind Group"),
 		.layout = mat.pipeline.getBindGroupLayout(0),
 		.entryCount = entries.size(),
 		.entries = entries.data()
 	});
 }
 
-drawing_state Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) clear_color /* = {} */, WAYLIB_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
+drawing_state geometry_buffer::begin_drawing(wgpu_state& state, STYLIZER_OPTIONAL(colorC) clear_color /* = {} */, STYLIZER_OPTIONAL(gpu_buffer&) utility_buffer /* = {} */) {
 	drawing_stateC out {.state = &state, .gbuffer = this};
 	// static frame_finalizers finalizers;
 
 	// Create a command encoder for the draw call
 	wgpu::CommandEncoderDescriptor encoderDesc = {};
-	encoderDesc.label = toWGPU("Waylib Render Command Encoder");
+	encoderDesc.label = toWGPU("Stylizer Render Command Encoder");
 	out.render_encoder = state.device.createCommandEncoder(encoderDesc);
-	encoderDesc.label = toWGPU("Waylib Command Encoder");
+	encoderDesc.label = toWGPU("Stylizer Command Encoder");
 	out.pre_encoder = state.device.createCommandEncoder(encoderDesc);
 
 
@@ -837,21 +837,21 @@ drawing_state Gbuffer::begin_drawing(wgpu_state& state, WAYLIB_OPTIONAL(colorC) 
 
 
 shader_preprocessor& shader_preprocessor::initialize_virtual_filesystem(const config &config /* = {} */) {
-	process_from_memory_and_cache(b::embed<"shaders/embeded/inverse.wgsl">().str(), "waylib/inverse", config);
-	process_from_memory_and_cache(b::embed<"shaders/embeded/mesh_data.wgsl">().str(), "waylib/mesh_data", config);
-	process_from_memory_and_cache(b::embed<"shaders/embeded/utility_data.wgsl">().str(), "waylib/utility_data", config);
-	process_from_memory_and_cache(b::embed<"shaders/embeded/vertex_data.wgsl">().str(), "waylib/vertex_data", config);
-	process_from_memory_and_cache(b::embed<"shaders/embeded/default_gbuffer_data.wgsl">().str(), "waylib/default_gbuffer_data", config);
-	process_from_memory_and_cache(b::embed<"shaders/embeded/default_gbuffer.wgsl">().str(), "waylib/default_gbuffer", config);
-	process_from_memory_and_cache(b::embed<"shaders/embeded/default_blit.wgsl">().str(), "waylib/default_blit", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/inverse.wgsl">().str(), "stylizer/inverse", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/mesh_data.wgsl">().str(), "stylizer/mesh_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/utility_data.wgsl">().str(), "stylizer/utility_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/vertex_data.wgsl">().str(), "stylizer/vertex_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/default_gbuffer_data.wgsl">().str(), "stylizer/default_gbuffer_data", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/default_gbuffer.wgsl">().str(), "stylizer/default_gbuffer", config);
+	process_from_memory_and_cache(b::embed<"shaders/embeded/default_blit.wgsl">().str(), "stylizer/default_blit", config);
 	return *this;
 }
 
 
-std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> shader::configure_render_pipeline_descriptor(
+std::pair<wgpu::RenderPipelineDescriptor, STYLIZER_OPTIONAL(wgpu::FragmentState)> shader::configure_render_pipeline_descriptor(
 	wgpu_state& state,
 	std::span<const WGPUColorTargetState> gbuffer_targets,
-	WAYLIB_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout /* = {} */,
+	STYLIZER_OPTIONAL(std::span<WGPUVertexBufferLayout>) mesh_layout /* = {} */,
 	wgpu::RenderPipelineDescriptor pipelineDesc /* = {} */
 ) {
 	// static WGPUBlendState blendState = {
@@ -870,7 +870,7 @@ std::pair<wgpu::RenderPipelineDescriptor, WAYLIB_OPTIONAL(wgpu::FragmentState)> 
 	// 	.nextInChain = nullptr,
 	// 	.format = state.surface_format,
 	// 	.blend = &blendState,
-	// 	.writeMask = wgpu::ColorWriteMask::All,
+	// 	.writeMask = wgpu::ColorWriteMasl::All,
 	// };
 
 
@@ -969,4 +969,4 @@ wgpu::PresentMode determine_best_presentation_mode(WGPUAdapter adapter, WGPUSurf
 	return wgpu::PresentMode::Fifo; // Always supported
 }
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

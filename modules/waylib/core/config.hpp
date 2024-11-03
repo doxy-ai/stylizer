@@ -1,21 +1,21 @@
 #pragma once
 
-#if !defined(WAYLIB_NAMESPACE) && !defined(WAYLIB_NO_NAMESPACE)
-	#define WAYLIB_NAMESPACE wl
+#if !defined(STYLIZER_NAMESPACE) && !defined(STYLIZER_NO_NAMESPACE)
+	#define STYLIZER_NAMESPACE sl
 #endif
 
-#ifdef WAYLIB_NO_NAMESPACE
-	#define WAYLIB_BEGIN_NAMESPACE
-	#define WAYLIB_END_NAMESPACE
-	#undef WAYLIB_NAMESPACE
-	#define WAYLIB_NAMESPACE
+#ifdef STYLIZER_NO_NAMESPACE
+	#define STYLIZER_BEGIN_NAMESPACE
+	#define STYLIZER_END_NAMESPACE
+	#undef STYLIZER_NAMESPACE
+	#define STYLIZER_NAMESPACE
 #else
-	#define WAYLIB_BEGIN_NAMESPACE namespace WAYLIB_NAMESPACE {
-	#define WAYLIB_END_NAMESPACE }
+	#define STYLIZER_BEGIN_NAMESPACE namespace STYLIZER_NAMESPACE {
+	#define STYLIZER_END_NAMESPACE }
 #endif
 
 
-#define WAYLIB_ENABLE_DEFAULT_PARAMETERS // We have default parameters in C++
+#define STYLIZER_ENABLE_DEFAULT_PARAMETERS // We have default parameters in C++
 
 #if defined(__cpp_lib_expected) && __cpp_lib_expected > 202202L
 	#include <expected>
@@ -26,7 +26,7 @@
 #include <string>
 
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 #if defined(__cpp_lib_expected) && __cpp_lib_expected > 202202L
 	using std::expected;
@@ -40,4 +40,4 @@ WAYLIB_BEGIN_NAMESPACE
 		#include "config.h"
 	}
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

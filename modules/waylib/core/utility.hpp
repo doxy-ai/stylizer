@@ -8,7 +8,7 @@
 	#include <stdexcept>
 #endif
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 	template<typename T>
 	concept releasable = requires(T t) {
@@ -28,7 +28,7 @@ WAYLIB_BEGIN_NAMESPACE
 		~auto_release() { if(*this) this->release(); }
 	};
 
-	#define WAYLIB_GENERIC_AUTO_RELEASE_SUPPORT(type)\
+	#define STYLIZER_GENERIC_AUTO_RELEASE_SUPPORT(type)\
 		using type ## C::type ## C;\
 		inline type ## C& c() { return *this; }\
 		type() {}\
@@ -53,16 +53,16 @@ WAYLIB_BEGIN_NAMESPACE
 		using std::runtime_error::runtime_error;
 	};
 
-	#define WAYLIB_THROW(x) throw exception(x)
+	#define STYLIZER_THROW(x) throw exception(x)
 #else
-	#define WAYLIB_THROW(x) assert((x, false))
+	#define STYLIZER_THROW(x) assert((x, false))
 #endif
 
 	template<typename T>
 	struct result: expected<T, std::string> {
 		using expected<T, std::string>::expected;
 
-		T throw_if_error() { return WAYLIB_NAMESPACE::throw_if_error(*this); }
+		T throw_if_error() { return STYLIZER_NAMESPACE::throw_if_error(*this); }
 	};
 
 	struct void_like{};
@@ -96,7 +96,7 @@ WAYLIB_BEGIN_NAMESPACE
 	public:
 		inline static void clear() { singleton.clear(); }
 		inline static std::string get_and_clear() { return std::move(singleton); }
-		inline static WAYLIB_NULLABLE(const char*) get() {
+		inline static STYLIZER_NULLABLE(const char*) get() {
 			if(singleton.empty()) return nullptr;
 			return singleton.c_str();
 		}
@@ -112,14 +112,14 @@ WAYLIB_BEGIN_NAMESPACE
 
 #ifdef __cpp_exceptions
 	template<typename T>
-	inline T throw_if_error(const WAYLIB_OPTIONAL(T)& opt) {
+	inline T throw_if_error(const STYLIZER_OPTIONAL(T)& opt) {
 		if(opt.is_allocated) return opt.value;
 
 		auto msg = errors::get_and_clear();
 		throw exception(msg.empty() ? "Null value encountered" : msg);
 	}
 	template<typename T>
-	inline T& throw_if_error(const WAYLIB_NULLABLE(T*) opt) {
+	inline T& throw_if_error(const STYLIZER_NULLABLE(T*) opt) {
 		if(opt) return *opt;
 
 		auto msg = errors::get_and_clear();
@@ -131,16 +131,16 @@ WAYLIB_BEGIN_NAMESPACE
 		throw exception(res.error());
 	}
 
-	#define WAYLIB_TRY try
-	#define WAYLIB_CATCH catch(const std::exception& e) { return WAYLIB_NAMESPACE::unexpected(e.what()); }
+	#define STYLIZER_TRY try
+	#define STYLIZER_CATCH catch(const std::exception& e) { return STYLIZER_NAMESPACE::unexpected(e.what()); }
 #else
 	template<typename T>
-	inline T throw_if_error(const WAYLIB_OPTIONAL(T)& opt) {
+	inline T throw_if_error(const STYLIZER_OPTIONAL(T)& opt) {
 		assert(opt.has_value, errors::get());
 		return opt.value;
 	}
 	template<typename T>
-	inline T& throw_if_error(const WAYLIB_NULLABLE(T*) opt) {
+	inline T& throw_if_error(const STYLIZER_NULLABLE(T*) opt) {
 		assert(opt, errors::get());
 		return *opt;
 	}
@@ -150,8 +150,8 @@ WAYLIB_BEGIN_NAMESPACE
 		throw exception(res.error());
 	}
 
-	#define WAYLIB_TRY
-	#define WAYLIB_CATCH
+	#define STYLIZER_TRY
+	#define STYLIZER_CATCH
 #endif
 
 
@@ -190,7 +190,7 @@ WAYLIB_BEGIN_NAMESPACE
 	}
 
 	template<typename Tin, typename Tout = Tin>
-	inline WAYLIB_OPTIONAL(detail::void2void_like_t<Tout>) res2opt(const result<Tin>& res) {
+	inline STYLIZER_OPTIONAL(detail::void2void_like_t<Tout>) res2opt(const result<Tin>& res) {
 		if(res) return *res;
 
 		errors::set(res);
@@ -202,4 +202,4 @@ WAYLIB_BEGIN_NAMESPACE
 	}
 
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

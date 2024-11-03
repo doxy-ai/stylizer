@@ -1,5 +1,5 @@
-#ifndef WAYLIB_ALLOCATED_6876E453E9AB8EC1A18EDA3CC811F7AF
-#define WAYLIB_ALLOCATED_6876E453E9AB8EC1A18EDA3CC811F7AF
+#ifndef STYLIZER_ALLOCATED_6876E453E9AB8EC1A18EDA3CC811F7AF
+#define STYLIZER_ALLOCATED_6876E453E9AB8EC1A18EDA3CC811F7AF
 
 #ifdef __cplusplus
 	template<typename T>
@@ -25,16 +25,16 @@
 		auto& operator[](size_t i) noexcept { return value[i]; }
 		const auto& operator[](size_t i) const noexcept { return value[i]; }
 	};
-	#ifdef WAYLIB_NAMESPACE_NAME
-		#define WAYLIB_MANAGEABLE(type) WAYLIB_NAMESPACE_NAME::managable<type>
+	#ifdef STYLIZER_NAMESPACE_NAME
+		#define STYLIZER_MANAGEABLE(type) STYLIZER_NAMESPACE_NAME::managable<type>
 	#else
-		#define WAYLIB_MANAGEABLE(type) managable<type>
+		#define STYLIZER_MANAGEABLE(type) managable<type>
 	#endif
 #else
-	#define WAYLIB_MANAGEABLE(type) struct {\
+	#define STYLIZER_MANAGEABLE(type) struct {\
 		bool is_managed;\
 		type value;\
 	}
 #endif
 
-#endif // WAYLIB_ALLOCATED_6876E453E9AB8EC1A18EDA3CC811F7AF
+#endif // STYLIZER_ALLOCATED_6876E453E9AB8EC1A18EDA3CC811F7AF

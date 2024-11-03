@@ -1,12 +1,10 @@
 #include "window.hpp"
-#include "waylib/core/config.h"
-#include "waylib/core/utility.hpp"
 
 #ifdef __EMSCRIPTEN__
 	void glfwInitHint(int hint, int value) {}
 #endif
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 bool glfw_initialized = false;
 void maybe_initialize_glfw() {
@@ -16,7 +14,7 @@ void maybe_initialize_glfw() {
 }
 
 
-struct window window::create(vec2u size, std::string_view name /* = "Waylib" */, window_config config /* = {} */) {
+struct window window::create(vec2u size, std::string_view name /* = "Stylizer" */, window_config config /* = {} */) {
 	maybe_initialize_glfw();
 
 	glfw::WindowHints{
@@ -57,69 +55,69 @@ struct window window::create(vec2u size, std::string_view name /* = "Waylib" */,
 }
 
 
-// WAYLIB_PREFIXED(window)* WAYLIB_PREFIXED(create_window) (
-// 	WAYLIB_PREFIXED(vec2u) size,
-// 	const char* title /*= "Waylib"*/,
-// 	WAYLIB_PREFIXED(window_config) config /*= {}*/
+// STYLIZER_PREFIXED(window)* STYLIZER_PREFIXED(create_window) (
+// 	STYLIZER_PREFIXED(vec2u) size,
+// 	const char* title /*= "Stylizer"*/,
+// 	STYLIZER_PREFIXED(window_config) config /*= {}*/
 // )  {
 // 	return new window(window::create(size, title, config));
 // }
 
-// void WAYLIB_PREFIXED(release_window) (
-// 	WAYLIB_PREFIXED(window)* window
+// void STYLIZER_PREFIXED(release_window) (
+// 	STYLIZER_PREFIXED(window)* window
 // )  {
 // 	delete window;
 // }
 
-// bool WAYLIB_PREFIXED(window_should_close)(
-// 	WAYLIB_PREFIXED(window)* window_,
+// bool STYLIZER_PREFIXED(window_should_close)(
+// 	STYLIZER_PREFIXED(window)* window_,
 // 	bool poll_events /* = true */
 // )  {
 // 	struct window& window = *static_cast<struct window*>(window_);
 // 	return window.should_close(poll_events);
 // }
 
-// vec2u WAYLIB_PREFIXED(window_get_dimensions)(
-// 	WAYLIB_PREFIXED(window)* window_
+// vec2u STYLIZER_PREFIXED(window_get_dimensions)(
+// 	STYLIZER_PREFIXED(window)* window_
 // )  {
 // 	struct window& window = *static_cast<struct window*>(window_);
 // 	return window.get_dimensions();
 // }
 
-// WGPUSurface WAYLIB_PREFIXED(window_get_surface)(
-// 	WAYLIB_PREFIXED(window)* window_,
+// WGPUSurface STYLIZER_PREFIXED(window_get_surface)(
+// 	STYLIZER_PREFIXED(window)* window_,
 // 	WGPUInstance instance
 // )  {
 // 	struct window& window = *static_cast<struct window*>(window_);
 // 	return window.get_surface(instance);
 // }
 
-// WAYLIB_OPTIONAL(WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) WAYLIB_PREFIXED(window_create_default_state)(
-// 	WAYLIB_PREFIXED(window)* window_,
+// STYLIZER_OPTIONAL(STYLIZER_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)) STYLIZER_PREFIXED(window_create_default_state)(
+// 	STYLIZER_PREFIXED(window)* window_,
 // 	bool prefer_low_power /* = false */
 // )  {
 // 	struct window& window = *static_cast<struct window*>(window_);
-// 	return res2opt(result<WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)>(
+// 	return res2opt(result<STYLIZER_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)>(
 // 		window.create_default_state(prefer_low_power)
 // 	));
 // }
 
-// bool WAYLIB_PREFIXED(window_configure_surface)(
-// 	WAYLIB_PREFIXED(window)* window_,
-// 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
-// 	WAYLIB_PREFIXED(surface_configuration) config /* = {} */
+// bool STYLIZER_PREFIXED(window_configure_surface)(
+// 	STYLIZER_PREFIXED(window)* window_,
+// 	STYLIZER_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
+// 	STYLIZER_PREFIXED(surface_configuration) config /* = {} */
 // )  {
 // 	struct window& window = *static_cast<struct window*>(window_);
 // 	return res2opt(window.configure_surface(static_cast<wgpu_state&>(*state), config));
 // }
 
-// bool WAYLIB_PREFIXED(window_reconfigure_surface_on_resize)(
-// 	WAYLIB_PREFIXED(window)* window_,
-// 	WAYLIB_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
-// 	WAYLIB_PREFIXED(surface_configuration) config /* = {} */
+// bool STYLIZER_PREFIXED(window_reconfigure_surface_on_resize)(
+// 	STYLIZER_PREFIXED(window)* window_,
+// 	STYLIZER_PREFIXED_C_CPP_TYPE(wgpu_state, wgpu_stateC)* state,
+// 	STYLIZER_PREFIXED(surface_configuration) config /* = {} */
 // )  {
 // 	struct window& window = *static_cast<struct window*>(window_);
 // 	return res2opt(window.reconfigure_surface_on_resize(static_cast<wgpu_state&>(*state), config));
 // }
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

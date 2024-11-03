@@ -2,7 +2,7 @@
 
 #include "waylib/core/core.hpp"
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 	extern "C" {
 		#include "img.h"
@@ -13,7 +13,7 @@ WAYLIB_BEGIN_NAMESPACE
 		image load_from_memory(std::span<std::byte> data);
 
 		inline image load_frames(std::span<const std::filesystem::path> paths) {
-			std::vector<wl::auto_release<image>> images; images.reserve(paths.size());
+			std::vector<auto_release<image>> images; images.reserve(paths.size());
 			for(auto& path: paths)
 				images.emplace_back(load(path));
 
@@ -21,4 +21,4 @@ WAYLIB_BEGIN_NAMESPACE
 		}
 	}
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE

@@ -1,5 +1,5 @@
-#ifndef WAYLIB_OPTIONAL_IS_AVAILABLE
-#define WAYLIB_OPTIONAL_IS_AVAILABLE
+#ifndef STYLIZER_OPTIONAL_IS_AVAILABLE
+#define STYLIZER_OPTIONAL_IS_AVAILABLE
 
 #ifdef __cplusplus
 	namespace detail {
@@ -36,18 +36,18 @@
 		std::remove_reference_t<T>* operator->() noexcept { return &value; }
 		const std::remove_reference_t<T>* operator->() const noexcept { return &value; }
 	};
-	#ifdef WAYLIB_NAMESPACE_NAME
-		#define WAYLIB_OPTIONAL(type) WAYLIB_NAMESPACE_NAME::optional<type>
+	#ifdef STYLIZER_NAMESPACE_NAME
+		#define STYLIZER_OPTIONAL(type) STYLIZER_NAMESPACE_NAME::optional<type>
 	#else
-		#define WAYLIB_OPTIONAL(type) optional<type>
+		#define STYLIZER_OPTIONAL(type) optional<type>
 	#endif
 #else
-	#define WAYLIB_OPTIONAL(type) struct {\
+	#define STYLIZER_OPTIONAL(type) struct {\
 		bool has_value;\
 		type value;\
 	}
 #endif
 
-#define WAYLIB_NULLABLE(type) type
+#define STYLIZER_NULLABLE(type) type
 
-#endif // WAYLIB_OPTIONAL_IS_AVAILABLE
+#endif // STYLIZER_OPTIONAL_IS_AVAILABLE

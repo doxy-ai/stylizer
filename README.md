@@ -1,8 +1,8 @@
-# Waylib
+# Stylizer
 
-Waylib is an experimental game engine based around stylization. To this end the engine is designed to provide some convenient APIs but also directly expose its raw underlying APIs for when convenience isn't enough, thus the internal APIs aren't just an implementation detail but for some workflows an essential part of the engine itself. To this end WebGPU (specifically Dawn) was chosen as the implementation API.
+Stylizer is an experimental game engine based around stylization. To this end the engine is designed to provide some convenient APIs but also directly expose its raw underlying APIs for when convenience isn't enough, thus the internal APIs aren't just an implementation detail but for some workflows an essential part of the engine itself. To this end WebGPU (specifically Dawn) was chosen as the implementation API.
 
-Waylib is heavily inspired by Raylib (the title was originally WebGPU Raylib) but has since expanded its scope to support various stylized workflows. Due to the extreme customizability certain stylization techniques need many of the raw internals are accessible, and the entire engine is delivered using a simple C like API. Many stylization techniques need access to intermediate buffers, thus the engine is optimized around deferred rendering where gbuffers are produced but care is taken to explicitly limit which buffers to create.
+Stylizer is heavily inspired by Raylib (the title was originally WebGPU Raylib) but has since expanded its scope to support various stylized workflows. Due to the extreme customizability certain stylization techniques need many of the raw internals are accessible, and the entire engine is delivered using a simple C like API. Many stylization techniques need access to intermediate buffers, thus the engine is optimized around deferred rendering where gbuffers are produced but care is taken to explicitly limit which buffers to create.
 
 Additionally the engine is designed around being increadibly modular, this library includes several such modules all of which can be ignored if desired:
 1) Core - WebGPU integrations and core rendering code, the core of the engine which every module assumes is present. Also provides some interface structures which other modules are expected to adhere to.

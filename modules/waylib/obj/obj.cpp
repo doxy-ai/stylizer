@@ -4,7 +4,7 @@
 #define TINYOBJLOADER_USE_MAPBOX_EARCUT
 #include "thirdparty/tiny_obj_loader.h"
 
-WAYLIB_BEGIN_NAMESPACE
+STYLIZER_BEGIN_NAMESPACE
 
 	model obj::load(const std::filesystem::path& file_path) {
 		auto path = std::filesystem::absolute(file_path);
@@ -16,8 +16,8 @@ WAYLIB_BEGIN_NAMESPACE
 		tinyobj::ObjReader reader;
 		if (!reader.ParseFromFile(path.string(), reader_config)) {
 			if (!reader.Error().empty())
-				WAYLIB_THROW(reader.Error());
-			WAYLIB_THROW("An unkown error occured while loading " + file_path.string());
+				STYLIZER_THROW(reader.Error());
+			STYLIZER_THROW("An unkown error occured while loading " + file_path.string());
 		}
 
 		if (!reader.Warning().empty())
@@ -97,4 +97,4 @@ WAYLIB_BEGIN_NAMESPACE
 		return out;
 	}
 
-WAYLIB_END_NAMESPACE
+STYLIZER_END_NAMESPACE
