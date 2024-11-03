@@ -37,7 +37,7 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	)_", {.vertex_entry_point = "vertex", .fragment_entry_point = "fragment", .preprocessor = &p});
 
 	sl::auto_release texture = std::move(sl::img::load("../resources/test.hdr")
-		.upload(state, {.sampler_type = sl::texture_create_sampler_type::Trilinear})
+		.upload(state, {.sampler_type = sl::texture_create_sampler_type::Nearest})
 		.generate_mipmaps(state));
 
 	sl::auto_release model = sl::obj::load("../resources/suzane_highpoly.obj");
@@ -56,13 +56,12 @@ fn fragment(vert: vertex_output) -> fragment_output {
 	model.transform = glm::identity<glm::mat4x4>();
 
 	// From: https://learnopengl.com/Advanced-OpenGL/Cubemaps
-	auto cubemapPaths = std::array<std::filesystem::path, 6>{
+
+	sl::auto_release skyTexture = sl::img::load_frames(std::array<std::filesystem::path, 6>{
 		"../resources/skybox/right.jpg", "../resources/skybox/left.jpg",
 		"../resources/skybox/top.jpg", "../resources/skybox/bottom.jpg",
 		"../resources/skybox/front.jpg", "../resources/skybox/back.jpg"
-	};
-	sl::auto_release skyTexture = sl::img::load_frames(cubemapPaths)
-		.upload_frames_as_cube(state, {.sampler_type = sl::texture_create_sampler_type::Trilinear});
+	}).upload_frames_as_cube(state, {.sampler_type = sl::texture_create_sampler_type::Trilinear});
 	sl::auto_release skyShader = sl::shader::from_wgsl(state, R"_(
 #define STYLIZER_CAMERA_DATA_IS_3D
 #include <stylizer/default_gbuffer>
@@ -114,7 +113,7 @@ fn fragment(vert: vertex_output) -> fragment_output {
 		utility_buffer = time.calculate().update_utility_buffer(state, utility_buffer);
 
 		camera.position = sl::vec3f(2 * cos(time.since_start), sin(time.since_start / 4), 2 * sin(time.since_start));
-		utility_buffer = camera.calculate_matricies(window.get_size()).update_utility_buffer(state, utility_buffer);
+		utility_buffer = camera.calculate_matrices(window.get_size()).update_utility_buffer(state, utility_buffer);
 
 		sl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}, utility_buffer);
 		{

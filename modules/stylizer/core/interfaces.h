@@ -485,7 +485,7 @@ typedef struct {
 		= 1
 #endif
 	; 
-} STYLIZER_PREFIXED(texture_create_configuation);
+} STYLIZER_PREFIXED(texture_create_configuration);
 
 typedef struct {
 	STYLIZER_NULLABLE(STYLIZER_PREFIXED_C_CPP_TYPE(geometry_buffer, geometry_bufferC)*) previous

@@ -137,7 +137,7 @@ drawing_state wgpu_state::begin_drawing_to_surface(STYLIZER_OPTIONAL(colorC) cle
 //////////////////////////////////////////////////////////////////////
 
 
-texture image::upload(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
+texture image::upload(wgpu_state& state, texture_create_configuration config /* = {} */, bool take_ownership_of_image /* = true */) {
 	config.format = config.format ? *config.format : static_cast<WGPUTextureFormat>(convert_format(format));
 	auto out = texture::create(state, vec3u(size, frames), config);
 
@@ -161,7 +161,7 @@ texture image::upload(wgpu_state& state, texture_create_configuation config /* =
 	return out;
 }
 
-cube_texture image::upload_frames_as_cube(wgpu_state& state, texture_create_configuation config /* = {} */, bool take_ownership_of_image /* = true */) {
+cube_texture image::upload_frames_as_cube(wgpu_state& state, texture_create_configuration config /* = {} */, bool take_ownership_of_image /* = true */) {
 	config.format = config.format ? *config.format : static_cast<WGPUTextureFormat>(convert_format(format));
 	auto with_view = config.with_view;
 	config.with_view = false;
@@ -524,7 +524,7 @@ fn compute(@builtin(global_invocation_id) id: vec3<u32>) {
 	};
 	compute.upload(state, {"Stylizer Mipmap Computer"});
 
-	// wgpu::Extent3D mipLevelSize = {size.x, size.y, 1}; // TOOD: do we need a tweak to properly handle cubemaps?
+	// wgpu::Extent3D mipLevelSize = {size.x, size.y, 1}; // TODO: do we need a tweak to properly handle cubemaps?
 	for (uint32_t level = 1; level < mip_levels; ++level) {
 		vec2u invocationCount = size / vec2u(2);
 		constexpr uint32_t workgroupSizePerDim = 8;

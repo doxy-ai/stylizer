@@ -74,7 +74,7 @@ fn fragment(vert: vertex_output) -> fragment_output {
 		utility_buffer = time.calculate().update_utility_buffer(state, utility_buffer);
 
 		camera.position = sl::vec3f(2 * cos(time.since_start), sin(time.since_start / 4), 2 * sin(time.since_start));
-		utility_buffer = camera.calculate_matricies(window.get_size()).update_utility_buffer(state, utility_buffer);
+		utility_buffer = camera.calculate_matrices(window.get_size()).update_utility_buffer(state, utility_buffer);
 
 		sl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}, utility_buffer);
 		{

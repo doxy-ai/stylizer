@@ -177,7 +177,7 @@ STYLIZER_BEGIN_NAMESPACE
 					return sizeof(**gray);
 				case image_format::Gray8:
 					return sizeof(**gray8);
-				default: assert(false && "An error has occured finding the number of bytes per pixel!");
+				default: assert(false && "An error has occurred finding the number of bytes per pixel!");
 			}
 		}
 		inline size_t bytes_per_pixel() { return bytes_per_pixel(format); }
@@ -213,8 +213,8 @@ STYLIZER_BEGIN_NAMESPACE
 			return out;
 		}
 
-		struct texture upload(wgpu_state& state, texture_create_configuation config = {}, bool take_ownership_of_image = true);
-		struct cube_texture upload_frames_as_cube(wgpu_state& state, texture_create_configuation config = {}, bool take_ownership_of_image = true);
+		struct texture upload(wgpu_state& state, texture_create_configuration config = {}, bool take_ownership_of_image = true);
+		struct cube_texture upload_frames_as_cube(wgpu_state& state, texture_create_configuration config = {}, bool take_ownership_of_image = true);
 	};
 
 
@@ -285,7 +285,7 @@ STYLIZER_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		static texture create(wgpu_state& state, vec3u size, texture_create_configuation config = {}) {
+		static texture create(wgpu_state& state, vec3u size, texture_create_configuration config = {}) {
 			texture out;
 			auto format = config.format ? *config.format : wgpu::TextureFormat::RGBA8UnormSrgb;
 			out.gpu_data = state.device.createTexture(WGPUTextureDescriptor {
@@ -310,7 +310,7 @@ STYLIZER_BEGIN_NAMESPACE
 			}
 			return out;
 		}
-		static texture create(wgpu_state& state, vec2u size, texture_create_configuation config = {}) {
+		static texture create(wgpu_state& state, vec2u size, texture_create_configuration config = {}) {
 			return create(state, {size.x, size.y, 1}, config);
 		}
 
@@ -393,7 +393,7 @@ STYLIZER_BEGIN_NAMESPACE
 
 
 	struct cube_texture: public texture {
-		static cube_texture create(wgpu_state& state, vec3u size, texture_create_configuation config = {}) {
+		static cube_texture create(wgpu_state& state, vec3u size, texture_create_configuration config = {}) {
 			assert(size.z % 6 == 0);
 
 			cube_texture out;
@@ -423,7 +423,7 @@ STYLIZER_BEGIN_NAMESPACE
 			return out;
 		}
 
-		static inline cube_texture create_from_images(wgpu_state& state, std::span<const image> images, texture_create_configuation config = {}, bool release_images = false) {
+		static inline cube_texture create_from_images(wgpu_state& state, std::span<const image> images, texture_create_configuration config = {}, bool release_images = false) {
 			auto image = image::merge(images);
 			if(release_images) for(auto& image: images)
 				const_cast<struct image&>(image).release();
@@ -1459,7 +1459,7 @@ STYLIZER_BEGIN_NAMESPACE
 					// .buffer = mesh.vertex_buffer,
 					.offset = 0,
 					// .size = metadata.vertex_buffer_size
-				}, WGPUBindGroupEntry{ // Indicies
+				}, WGPUBindGroupEntry{ // Indices
 					.binding = 1,
 					// .buffer = metadata.is_indexed ? mesh.index_buffer : zeroBuffer->data,
 					.offset = 0,
@@ -1625,7 +1625,7 @@ STYLIZER_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		camera3D& calculate_matricies(vec2u window_size) {
+		camera3D& calculate_matrices(vec2u window_size) {
 			view_matrix = glm::lookAt(position, target_position, up);
 			if(orthographic) {
 				float right = field_of_view / 2;
@@ -1672,7 +1672,7 @@ STYLIZER_BEGIN_NAMESPACE
 			return *this;
 		}
 
-		camera2D& calculate_matricies(vec2u window_size) {
+		camera2D& calculate_matrices(vec2u window_size) {
 			vec3f position = {target_position.x, target_position.y, -1};
 			vec4f up = {0, 1, 0, 0};
 			up = glm::rotate(glm::identity<glm::mat4x4>(), glm::radians(rotation)/* .radian_value() */, vec3f{0, 0, 1}) * up;

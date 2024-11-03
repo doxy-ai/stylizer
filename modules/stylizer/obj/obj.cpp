@@ -17,7 +17,7 @@ STYLIZER_BEGIN_NAMESPACE
 		if (!reader.ParseFromFile(path.string(), reader_config)) {
 			if (!reader.Error().empty())
 				STYLIZER_THROW(reader.Error());
-			STYLIZER_THROW("An unkown error occured while loading " + file_path.string());
+			STYLIZER_THROW("An unknown error occurred while loading " + file_path.string());
 		}
 
 		if (!reader.Warning().empty())

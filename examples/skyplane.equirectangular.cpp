@@ -31,7 +31,7 @@ fn vertex(in: vertex_input, @builtin(vertex_index) vertex_index: u32, @builtin(i
 fn fragment(vert: vertex_output) -> fragment_output {
 	// Calculate the direction of the pixel
 	let clipSpacePos = vec4(vert.position.xy, 1, 1);
-	let V = inverse_view_matrix(utility.camera.view_matrix); // NOTE: inverse4x4 could be used as well, but inverse_view_matrix is cheaper (but relies on assumptions about view matricies that aren't true in general)
+	let V = inverse_view_matrix(utility.camera.view_matrix); // NOTE: inverse4x4 could be used as well, but inverse_view_matrix is cheaper (but relies on assumptions about view matrices that aren't true in general)
 	let P = inverse4x4(utility.camera.projection_matrix);
 	let worldSpacePos = V * P * clipSpacePos;
 	let direction = normalize(worldSpacePos.xyz - utility.camera.position);
@@ -69,7 +69,7 @@ fn fragment(vert: vertex_output) -> fragment_output {
 		utility_buffer = time.calculate().update_utility_buffer(state, utility_buffer);
 
 		camera.position = sl::vec3f(2 * cos(time.since_start), sin(time.since_start / 4), 2 * sin(time.since_start));
-		utility_buffer = camera.calculate_matricies(window.get_size()).update_utility_buffer(state, utility_buffer);
+		utility_buffer = camera.calculate_matrices(window.get_size()).update_utility_buffer(state, utility_buffer);
 
 		sl::auto_release draw = gbuffer.begin_drawing(state, {{.1, .2, .7, 1}}, utility_buffer);
 		{
