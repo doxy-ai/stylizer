@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "waylib/stylizer.hpp"
+#include "stylizer/stylizer.hpp"
 
 int main() {
 	sl::auto_release window = sl::window::create({800, 600});

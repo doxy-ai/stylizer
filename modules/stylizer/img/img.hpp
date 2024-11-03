@@ -1,6 +1,6 @@
 #pragma once
 
-#include "waylib/core/core.hpp"
+#include "stylizer/core/core.hpp"
 
 STYLIZER_BEGIN_NAMESPACE
 

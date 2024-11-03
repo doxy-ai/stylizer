@@ -1,16 +1,16 @@
-[submodule "modules/waylib/core/thirdparty/WebGPU-distribution"]
-	path = modules/waylib/core/thirdparty/WebGPU-distribution
+[submodule "modules/stylizer/core/thirdparty/WebGPU-distribution"]
+	path = modules/stylizer/core/thirdparty/WebGPU-distribution
 	url = https://github.com/doxy-ai/WebGPU-distribution.git
 	branch = dawn
-[submodule "modules/waylib/window/thirdparty/glfwpp"]
-	path = modules/waylib/window/thirdparty/glfwpp
+[submodule "modules/stylizer/window/thirdparty/glfwpp"]
+	path = modules/stylizer/window/thirdparty/glfwpp
 	url = https://github.com/doxy-ai/glfwpp.git
-[submodule "modules/waylib/core/thirdparty/glm"]
-	path = modules/waylib/core/thirdparty/glm
+[submodule "modules/stylizer/core/thirdparty/glm"]
+	path = modules/stylizer/core/thirdparty/glm
 	url = https://github.com/g-truc/glm
-[submodule "modules/waylib/window/thirdparty/glfw3webgpu"]
-	path = modules/waylib/window/thirdparty/glfw3webgpu
+[submodule "modules/stylizer/window/thirdparty/glfw3webgpu"]
+	path = modules/stylizer/window/thirdparty/glfw3webgpu
 	url = https://github.com/eliemichel/glfw3webgpu.git
-[submodule "modules/waylib/core/thirdparty/embed"]
-	path = modules/waylib/core/thirdparty/embed
+[submodule "modules/stylizer/core/thirdparty/embed"]
+	path = modules/stylizer/core/thirdparty/embed
 	url = https://github.com/batterycenter/embed.git

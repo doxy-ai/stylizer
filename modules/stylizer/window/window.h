@@ -5,7 +5,7 @@
 	#include <GLFW/glfw3.h>
 #endif
 
-#include "waylib/core/core.h"
+#include "stylizer/core/core.h"
 
 typedef struct STYLIZER_PREFIXED(window_config) { // TODO: Fill out optional parameters flag
 	bool resizable
