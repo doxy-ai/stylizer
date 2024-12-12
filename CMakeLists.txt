@@ -3,10 +3,9 @@ project(stylizer CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_subdirectory(modules/api)
+add_subdirectory(modules/stylizer/api)
+add_subdirectory(modules/stylizer/core)
 
 add_executable(tst "test.cpp")
-target_link_libraries(tst PUBLIC stylizer::api)
+target_link_libraries(tst PUBLIC stylizer::core)
 
-include(modules/api/cmake/glfw.cmake)
-target_setup_glfw_for_stylizer(tst)
