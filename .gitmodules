@@ -1,6 +1,3 @@
 [submodule "modules/stylizer/api"]
 	path = modules/stylizer/api
 	url = https://github.com/doxy-ai/stylizer.api
-[submodule "modules/stylizer/window/thirdparty/glfwpp"]
-	path = modules/stylizer/window/thirdparty/glfwpp
-	url = https://github.com/doxy-ai/glfwpp.git
