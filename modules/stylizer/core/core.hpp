@@ -3,6 +3,8 @@
 #include "config.hpp"
 #include "core.h"
 
+#include "slang_types.hpp"
+
 #include "stylizer/api/api.hpp"
 #include "thirdparty/thread_pool.hpp"
 
