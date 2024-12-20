@@ -21,7 +21,7 @@ namespace stylizer {
 	};
 	bool GLFW::initalized = false;
 
-	struct window window::create(api::vec2u size, std::string_view name /* = "Stylizer" */, window_config config /* = {} */) {
+	struct window window::create(uint2 size, std::string_view name /* = "Stylizer" */, create_config config /* = {} */) {
 		GLFW::maybe_initalize();
 
 		glfwWindowHint(GLFW_RESIZABLE, config.resizable);
@@ -60,7 +60,7 @@ namespace stylizer {
 		glfwSetWindowUserPointer(out.window_, &out);
 		glfwSetFramebufferSizeCallback(out.window_, +[](GLFWwindow* window_, int width, int height){
 			window& window = *(struct window*)glfwGetWindowUserPointer(window_);
-			window.resized(window, width, height);
+			window.resized(window, {width, height});
 		});
 		return out;
 	}
@@ -76,17 +76,17 @@ namespace stylizer {
 		if(process_events) glfwPollEvents();
 		return glfwWindowShouldClose(window_);
 	}
-	api::vec2u window::get_dimensions() const {
+	uint2 window::get_dimensions() const {
 		int x, y;
 		glfwGetFramebufferSize(window_, &x,&y);
-		return {static_cast<size_t>(x), static_cast<size_t>(y)};
+		return {x, y};
 	}
 
 #ifndef STYLIZER_USE_ABSTRACT_API
 	context window::create_context(const api::device::create_config& config /* = {} */) {
 		auto partial = context::create_default(config);
 		partial.surface = api::glfw::create_surface<api::current_backend::surface>(window_);
-		return context::set_c_pointers(partial);
+		return partial;
 	}
 #endif
 
