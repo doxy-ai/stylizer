@@ -4,3 +4,6 @@
 [submodule "modules/stylizer/core/thirdparty/hlslpp"]
 	path = modules/stylizer/core/thirdparty/hlslpp
 	url = https://github.com/redorav/hlslpp.git
+[submodule "modules/stylizer/core/thirdparty/embed"]
+	path = modules/stylizer/core/thirdparty/embed
+	url = https://github.com/batterycenter/embed.git
