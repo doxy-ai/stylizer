@@ -1,8 +1,10 @@
 #include "stylizer/core/core.hpp"
-#include "stylizer/window/window.hpp"
 #include "stylizer/obj/obj.hpp"
+#include "stylizer/window/window.hpp"
 
 int main() {
+	using namespace stylizer::api::operators;
+
 	stylizer::auto_release window = stylizer::window::create({800, 600});
 	stylizer::auto_release context = window.create_context();
 	window.reconfigure_surface_on_resize(context, window.determine_optimal_config(context));
