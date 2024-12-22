@@ -5,6 +5,11 @@
 #include <battery/embed.hpp>
 
 namespace stylizer {
+	context context::null = {};
+	template<>
+	const float4 mesh::vertex<true>::not_available = {};
+	template<>
+	const float4 mesh::vertex<false>::not_available = {};
 
 	void shader_processor::inject_default_virtual_filesystem() {
 		bool included = []{
