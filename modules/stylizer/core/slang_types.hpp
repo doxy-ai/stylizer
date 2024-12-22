@@ -11,10 +11,27 @@ namespace stylizer {
 		template<>
 		struct vertex_buffer_type_format<float2> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::f32x2; };
 		template<>
-	    struct vertex_buffer_type_format<float3> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::f32x3; };
+		struct vertex_buffer_type_format<float3> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::f32x3; };
 		template<>
-	    struct vertex_buffer_type_format<float4> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::f32x4; };
-	
+		struct vertex_buffer_type_format<float4> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::f32x4; };
+		template<>
+		struct vertex_buffer_type_format<int1> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::i32x1; };
+		template<>
+		struct vertex_buffer_type_format<int2> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::i32x2; };
+		template<>
+	    struct vertex_buffer_type_format<int3> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::i32x3; };
+		template<>
+	    struct vertex_buffer_type_format<int4> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::i32x4; };
+		template<>
+		struct vertex_buffer_type_format<uint1> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::u32x1; };
+		template<>
+		struct vertex_buffer_type_format<uint2> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::u32x2; };
+		template<>
+	    struct vertex_buffer_type_format<uint3> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::u32x3; };
+		template<>
+	    struct vertex_buffer_type_format<uint4> { static constexpr auto format = render_pipeline::config::vertex_buffer_layout::attribute::format::u32x4; };
+
+
 		inline uint2 convert(vec2u v) { return {v.x, v.y}; }
 		inline vec2u convert(int2 v) { return {static_cast<size_t>(v.x), static_cast<size_t>(v.y)}; }
 		inline vec2u convert(uint2 v) { return {v.x, v.y}; }
