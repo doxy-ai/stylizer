@@ -1,8 +1,11 @@
 #include "stylizer/core/core.hpp"
-#include "stylizer/window/window.hpp"
+#include "stylizer/img/img.hpp"
 #include "stylizer/obj/obj.hpp"
+#include "stylizer/window/window.hpp"
 
 int main() {
+	using namespace stylizer::api::operators;
+
 	stylizer::auto_release window = stylizer::window::create({800, 600});
 	stylizer::auto_release context = window.create_context();
 	window.reconfigure_surface_on_resize(context, window.determine_optimal_config(context));
@@ -17,28 +20,34 @@ int main() {
 import stylizer;
 import stylizer_default;
 
-struct FS_Input {
+struct vertex_output {
 	float4 position : SV_Position;
+	float2 uv : TEXCOORD0;
 };
 
 [[shader("vertex")]]
-FS_Input vertex(vertex_input input) {
-	FS_Input output;
-	output.position = float4(input.position.xyz, 1.0);
-	return output;
+vertex_output vertex(in vertex_input input) {
+	return {float4(input.position.xyz, 1.0), input.uvs.xy};
 }
 
+[[vk::binding(0)]] Texture2D texture;
+[[vk::binding(1)]] SamplerState sample;
+
 [[shader("fragment")]]
-fragment_output fragment() {
-	fragment_output output;
-	output.color = imported_color;
-	return output;
+fragment_output fragment(vertex_output input) {
+	return {texture.Sample(sample, input.uv)};
 })_";
 		material = stylizer::material::create_from_source_for_geometry_buffer(context, slang, {
 			{stylizer::api::shader::stage::Vertex, "vertex"},
 			{stylizer::api::shader::stage::Fragment, "fragment"},
 		}, gbuffer);
 	}
+	material.textures.emplace_back(stylizer::img::load("../examples/resources/test.hdr")
+		.upload(context, {.usage = stylizer::api::usage::TextureBinding | stylizer::api::usage::CopySource})
+		.generate_mipmaps(context)
+		.configure_sampler(context /*, {.magnify_linear = true, .minify_linear = true, .mip_linear = true} */) // Trilinear
+		.move()
+	);
 	obj.default_material = &material;
 
 	while(!window.should_close(context)) {
@@ -46,13 +55,7 @@ fragment_output fragment() {
 			obj.draw(draw);
 		} draw.one_shot_submit();
 
-		// try {
-			stylizer::auto_release surface_texture = context.get_surface_texture();
-			surface_texture.blit_from(context, gbuffer.color);
-			context.present();
-		// } catch(stylizer::api::surface::texture_acquisition_failed e) {
-		// 	std::cerr << e.what() << std::endl;
-		// }
+		context.present(gbuffer.color);
 	}
 
 	context.release(true);
