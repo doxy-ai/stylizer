@@ -3,9 +3,10 @@
 #include "config.hpp"
 #include "slang_types.hpp"
 #include "optional.h"
-#include "managable.h"
+#include "maybe_owned.hpp"
 
 #include "stylizer/api/api.hpp"
+#include "stylizer/api/webgpu/bind_group.hpp"
 #include "thirdparty/thread_pool.hpp"
 #include <concepts>
 #include <cstring>
@@ -61,6 +62,7 @@ namespace stylizer {
 		struct context* context;
 		STYLIZER_NULLABLE(struct geometry_buffer*) gbuffer = nullptr;
 		operator stylizer::api::device&();
+		operator struct context&();
 
 		const api::buffer& get_zero_buffer_singleton(api::usage usage = api::usage::Storage, size_t minimum_size = 0);
 
@@ -77,10 +79,23 @@ namespace stylizer {
 	struct texture: public STYLIZER_API_NAMESPACE::texture {
 		using super = STYLIZER_API_NAMESPACE::texture;
 
+		// It is very common to load an image, upload it, and generate it mipmaps all in one chain... this overide allows this chain to be performed without an as cast at the end!
+		inline texture& generate_mipmaps(api::device& device, size_t first_mip_level = 0, std::optional<size_t> mip_levels_override = {}) {
+			super::generate_mipmaps(device, first_mip_level, mip_levels_override);
+			return *this;
+		}
+
+		inline texture& configure_sampler(api::device& device, const sampler_config& config = {}) { // Like generate_mipmaps, configuring a sampler is also common
+			super::configure_sampler(device, config);
+			return *this;
+		}
+
 		drawing_state begin_drawing(context& ctx, float4 clear_color, bool one_shot = true);
-		drawing_state begin_drawing(context& ctx, optional<float3> clear_color = {}, bool one_shot = true) {
+		inline drawing_state begin_drawing(context& ctx, optional<float3> clear_color = {}, bool one_shot = true) {
 			return begin_drawing(ctx, clear_color ? float4(*clear_color, 1) : float4{0, 0, 0, 1}, one_shot);
 		}
+
+		texture&& move() { return std::move(*this); }
 	};
 
 
@@ -112,6 +127,11 @@ namespace stylizer {
 
 		void process_events() { device.process_events(); }
 		void present() { surface.present(device); }
+		void present(const api::texture& texture) {
+			stylizer::auto_release surface_texture = get_surface_texture();
+			surface_texture.blit_from(*this, texture);
+			present();
+		}
 
 		texture get_surface_texture() {
 			auto tmp = surface.next_texture(device);
@@ -133,6 +153,10 @@ namespace stylizer {
 	inline drawing_state::operator stylizer::api::device&() {
 		assert(context);
 		return context->device;
+	}
+	inline drawing_state::operator stylizer::context&() {
+		assert(context);
+		return *context;
 	}
 	inline const api::buffer& drawing_state::get_zero_buffer_singleton(api::usage usage /* = api::usage::Storage */, size_t minimum_size /* = 0 */) {
 		assert(context);
@@ -223,7 +247,7 @@ namespace stylizer {
 			auto depth_attachment = this->depth_attachment();
 			depth_attachment->depth_clear_value = clear_depth ? *clear_depth : 1;
 
-			drawing_state out;			
+			drawing_state out;
 			(STYLIZER_API_NAMESPACE::render_pass&)out = ctx.device.create_render_pass(color_attachments, depth_attachment, one_shot);
 			out.context = &ctx;
 			out.gbuffer = this;
@@ -466,10 +490,10 @@ namespace stylizer {
 
 		static void inject_default_virtual_filesystem();
 
-		static std::pair<std::vector<managable<STYLIZER_API_TYPE(shader)>>, api::pipeline::entry_points> process_shaders(context& ctx, std::string_view content, const entry_points& eps, std::string_view module = "generated") {
+		static std::pair<std::vector<maybe_owned_t<STYLIZER_API_TYPE(shader)>>, api::pipeline::entry_points> process_shaders(context& ctx, std::string_view content, const entry_points& eps, std::string_view module = "generated") {
 			inject_default_virtual_filesystem();
 
-			std::vector<managable<STYLIZER_API_TYPE(shader)>> shaders; shaders.reserve(eps.size());
+			std::vector<maybe_owned_t<STYLIZER_API_TYPE(shader)>> shaders; shaders.reserve(eps.size());
 			api::pipeline::entry_points api;
 			auto session = get_session();
 			auto path = std::string{module} + ".slang";
@@ -479,8 +503,9 @@ namespace stylizer {
 					api::shader::to_slcross(stage)
 				);
 				assert(spirv.size());
-				shaders.emplace_back(true, ctx.device.create_shader_from_spirv(std::move(spirv)));
-				api.emplace(stage, api::pipeline::entry_point{.shader = &shaders.back().value});
+				// auto dbg = slcross::wgsl::generate(spirv);
+				shaders.emplace_back(ctx.device.create_shader_from_spirv(std::move(spirv)));
+				api.emplace(stage, api::pipeline::entry_point{.shader = &shaders.back().get()});
 			}
 			return {std::move(shaders), api};
 		}
@@ -489,9 +514,9 @@ namespace stylizer {
 
 	struct material {
 		STYLIZER_API_TYPE(render_pipeline) pipeline = {};
-		std::vector<managable<STYLIZER_API_TYPE(shader)>> shaders;
-		std::vector<managable<STYLIZER_API_TYPE(buffer)>> buffers;
-		std::vector<managable<texture>> textures;
+		std::vector<maybe_owned_t<STYLIZER_API_TYPE(shader)>> shaders;
+		std::vector<maybe_owned_t<STYLIZER_API_TYPE(buffer)>> buffers;
+		std::vector<maybe_owned_t<texture>> textures;
 
 		operator bool() const { return pipeline; }
 
@@ -543,18 +568,29 @@ namespace stylizer {
 			return upload_from_shaders_for_geometry_buffer(ctx, eps, gbuffer, vertex_layout, config);
 		}
 
+		STYLIZER_API_TYPE(bind_group) get_bind_group(context& ctx) {
+			std::vector<api::bind_group::binding> bindings; bindings.reserve(textures.size() * 2 + buffers.size());
+			for(auto& buffer: buffers)
+				bindings.emplace_back(api::bind_group::buffer_binding{
+					.buffer = (assert(buffer.valid()), &buffer.get()),
+				});
+			for(auto& texture: textures)
+				bindings.emplace_back(api::bind_group::texture_binding{.texture = (assert(texture.valid()), &texture.get())});
+			return pipeline.create_bind_group(ctx, 0, bindings);
+		}
+
 		void release_shaders() {
 			for(auto& shader: shaders)
-				if(shader.is_managed) shader->release();
+				if(shader.owned()) shader->release();
 		}
 
 		void release() {
 			pipeline.release();
 			release_shaders();
 			for(auto& buffer: buffers)
-				if(buffer.is_managed) buffer->release();
+				if(buffer.owned()) buffer->release();
 			for(auto& texture: textures)
-				if(texture.is_managed) texture->release();
+				if(texture.owned()) texture->release();
 		}
 	};
 
@@ -571,32 +607,6 @@ namespace stylizer {
 
 	template<std::derived_from<mesh> Tmesh = mesh, std::derived_from<material> Tmaterial = material>
 	struct model {
-		template<typename T>
-		using maybe_owned_t = std::variant<T, T*>;
-		template<typename T>
-		static T& get(maybe_owned_t<T>& owned) {
-			if(owned.index() == 0)
-				return std::get<0>(owned);
-
-			auto ptr = std::get<1>(owned);
-			assert(ptr);
-			return *ptr;
-		}
-		template<typename T>
-		static const T& get(const maybe_owned_t<T>& owned) {
-			if(owned.index() == 0)
-				return std::get<0>(owned);
-
-			auto ptr = std::get<1>(owned);
-			assert(ptr);
-			return *ptr;
-		}
-		template<typename T>
-		static bool valid(const maybe_owned_t<T>& owned) {
-			return (owned.index() == 0 && std::get<0>(owned))
-				|| (owned.index() == 1 && std::get<1>(owned) && *std::get<1>(owned));
-		}
-
 		float4x4 transform = float4x4::identity();
 		maybe_owned_t<Tmaterial> default_material = nullptr;
 		struct material_mapped_mesh{
@@ -604,15 +614,15 @@ namespace stylizer {
 			STYLIZER_NULLABLE(maybe_owned_t<Tmaterial>) material = nullptr;
 
 			bool operator<(const material_mapped_mesh& o) const {
-				return get(mesh) < get(o.mesh);
+				return *mesh < *o.mesh;
 			}
 		};
 		std::set<material_mapped_mesh> material_mapped_meshes;
 
 		operator bool() const {
-			if(valid(default_material)) return true;
+			if(default_material.owned()) return true;
 			for(auto& [mesh, material]: material_mapped_meshes)
-				if(valid(mesh) || valid(material)) return true;
+				if(mesh.owned() || material.owned()) return true;
 			return false;
 		}
 
@@ -624,8 +634,8 @@ namespace stylizer {
 			draw.defer([instance_buffer]() mutable { instance_buffer.release(); });
 
 			for(auto& [mesh_, material_]: material_mapped_meshes) {
-				auto& mesh = const_cast<Tmesh&>(get(mesh_));
-				auto& material = valid(material_) ? get(material_) : (assert(valid(default_material)), get(default_material));
+				auto& mesh = const_cast<Tmesh&>(*mesh_);
+				auto& material = const_cast<Tmaterial&>(material_.valid() ? *material_ : (assert(default_material.valid()), *default_material));
 
 				auto metadata = mesh.cpu_metadata();
 				size_t attribute_size = metadata.vertex_count * sizeof(float4);
@@ -633,6 +643,7 @@ namespace stylizer {
 				auto& zero_buffer = draw.get_zero_buffer_singleton(api::usage::Index | api::usage::Vertex, attribute_size);
 
 				draw.bind_render_pipeline(draw, material.pipeline)
+					.bind_render_group(draw, material.get_bind_group(draw), true)
 					.bind_vertex_buffer(draw, 0, mesh.get_vertex_buffer(), metadata.position_start, attribute_size)
 					.bind_vertex_buffer(draw, 1, mesh.normals ? mesh.get_vertex_buffer() : zero_buffer, metadata.normals_start, attribute_size)
 					.bind_vertex_buffer(draw, 2, mesh.tangents ? mesh.get_vertex_buffer() : zero_buffer, metadata.tangents_start, attribute_size)
@@ -664,10 +675,121 @@ namespace stylizer {
 	};
 
 
+//////////////////////////////////////////////////////////////////////
+// # Image
+//////////////////////////////////////////////////////////////////////
+
+
+	struct image {
+		using data_t = std::variant<std::monostate, std::vector<std::byte>, std::vector<api::color32>, std::vector<api::color8>, std::vector<float>, std::vector<uint8_t>>;
+
+		api::texture::format format;
+		data_t raw_data = {};
+		uint2 size;
+		size_t frames;
+
+		operator bool() const { return raw_data.index() > 0; }
+
+		std::span<std::byte> data() {
+			std::span<const std::byte> out;
+			std::visit([&out](auto& vector){
+				using vector_t = std::remove_reference_t<decltype(vector)>;
+				if constexpr(std::is_same_v<vector_t, std::monostate>)
+					assert(("Can't access null image data!", false));
+				else out = byte_span<typename vector_t::value_type>(vector);
+			}, raw_data);
+			return {(std::byte*)out.data(), out.size()};
+		}
+		std::span<api::color32> rgba32() { return std::get<std::vector<api::color32>>(raw_data); }
+		std::span<api::color8> rgba8() { return std::get<std::vector<api::color8>>(raw_data); }
+		std::span<float> r32() { return std::get<std::vector<float>>(raw_data); }
+		std::span<uint8_t> r8() { return std::get<std::vector<uint8_t>>(raw_data); }
+
+		static image not_found(size_t dimensions = 16) {
+			image img;
+			img.format = api::texture::format::RGBA8;
+			img.raw_data = std::vector<api::color8>(dimensions * dimensions);
+			for (size_t i = 0; i < dimensions; ++i) {
+				for (size_t j = 0; j < dimensions; ++j) {
+					api::color8 *p = &img.rgba8()[j * dimensions + i];
+					p->r = (float(i) / dimensions) * 255;
+					p->g = (float(j) / dimensions) * 255;
+					p->b = .5 * 255;
+					p->a = 1 * 255;
+				}
+			}
+
+			img.size.x = img.size.y = dimensions;
+			img.frames = 1;
+			return img;
+		}
+
+		static image not_found_frames(size_t frames, size_t dimensions = 16) {
+			auto img = not_found(dimensions);
+			std::vector<image> images(frames, img);
+
+			auto out = merge(images);
+			img.release();
+			return out;
+		}
+
+		inline size_t bytes_per_pixel() { return api::bytes_per_pixel(format); }
+
+		static inline image merge(std::span<const image> images) {
+			assert(images.size() > 1);
+
+			image out = images[0];
+			out.frames = images.size();
+			size_t size_each = out.size.x * out.size.y;
+			switch(out.format) {
+			break; case api::texture::format::RGBA32:
+			 	out.raw_data = std::vector<api::color32>(size_each * out.frames);
+				size_each *= sizeof(api::color32);
+			break; case api::texture::format::RGBA8:
+				out.raw_data = std::vector<api::color8>(size_each * out.frames);
+				size_each *= sizeof(api::color8);
+			break; case api::texture::format::Gray32:
+				out.raw_data = std::vector<float>(size_each * out.frames);
+				size_each *= sizeof(float);
+			break; case api::texture::format::Gray8:
+				out.raw_data = std::vector<uint8_t>(size_each * out.frames);
+				size_each *= sizeof(uint8_t);
+			break; default: STYLIZER_THROW("Invalid image format `" + std::string(magic_enum::enum_name(out.format)) + "` failed to merge!");
+			}
+
+			size_t i = 0;
+			for(auto& other: images) {
+				assert(out.size.x == other.size.x && out.size.y == other.size.y);
+				assert(out.format == other.format);
+				std::memcpy(out.data().data() + i++ * size_each, const_cast<image&>(other).data().data(), size_each);
+			}
+			return out;
+		}
+
+		texture upload(context& ctx, api::texture::create_config config = {}, std::string_view label = {}) {
+			using namespace api::operators;
+
+			const_cast<std::string_view&>(config.label) = label.empty() ? std::string_view("Stylizer Texture") : label;
+			config.format = format;
+			config.size = api::convert(uint3(size, 1));
+			config.usage |= api::usage::CopyDestination;
+
+			size_t bytes_per_row = config.size.x * api::bytes_per_pixel(config.format);
+			auto out = ctx.device.create_and_write_texture(data(), {0, bytes_per_row, config.size.y}, config);
+			return (texture&)out;
+		}
+		// texture upload_frames_as_cube(context& ctx, texture_create_configuration config = {}, STYLIZER_OPTIONAL(std::string_view) label = {}, bool release_image = true);
+
+		inline void release() { image::~image(); }
+	};
+
+
+
 	namespace core { // default
 		using mesh = stylizer::mesh;
 		using material = stylizer::material;
 		using model = stylizer::model<mesh, material>;
+		using image = stylizer::image;
 	}
 
 } // namespace stylizer
