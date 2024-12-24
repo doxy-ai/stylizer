@@ -10,4 +10,4 @@ function(stylizer_embed TARGET FILENAME)
 endfunction(stylizer_embed)
 
 stylizer_embed(stylizer_core shaders/embeded/stylizer.slang)
-stylizer_embed(stylizer_core shaders/embeded/stylizer.default.slang)
+stylizer_embed(stylizer_core shaders/embeded/stylizer.core.slang)
