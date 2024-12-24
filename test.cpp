@@ -1,3 +1,4 @@
+#include "stylizer/api/api.hpp"
 #include "stylizer/core/core.hpp"
 #include "stylizer/img/img.hpp"
 #include "stylizer/obj/obj.hpp"
@@ -18,23 +19,19 @@ int main() {
 	stylizer::auto_release<stylizer::material> material; { // Braced like this so the shader code can be folded away in the editor!
 		auto slang = R"_(
 import stylizer;
-import stylizer_default;
-
-struct vertex_output {
-	float4 position : SV_Position;
-	float2 uv : TEXCOORD0;
-};
+import stylizer_core;
+using namespace stylizer::math;
 
 [[shader("vertex")]]
-vertex_output vertex(in vertex_input input) {
-	return {float4(input.position.xyz, 1.0), input.uvs.xy};
+stylizer::vertex_to_fragment vertex(stylizer::vertex_input input, uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) {
+	return input.unpack_full(vertex_id, instance_id, identity_matrix, identity_matrix);
 }
 
 [[vk::binding(0)]] Texture2D texture;
 [[vk::binding(1)]] SamplerState sample;
 
 [[shader("fragment")]]
-fragment_output fragment(vertex_output input) {
+stylizer::fragment_output fragment(stylizer::vertex_to_fragment input) {
 	return {texture.Sample(sample, input.uv)};
 })_";
 		material = stylizer::material::create_from_source_for_geometry_buffer(context, slang, {
@@ -50,9 +47,45 @@ fragment_output fragment(vertex_output input) {
 	);
 	obj.default_material = &material;
 
+	stylizer::auto_release<stylizer::material> skyMat; { // Braced like this so the shader code can be folded away in the editor!
+		auto slang = R"_(
+import stylizer;
+import stylizer_core;
+using namespace stylizer::math;
+
+[[shader("vertex")]]
+stylizer::vertex_to_fragment vertex(stylizer::vertex_input input, uint vertex_id : SV_VertexID, uint instance_id : SV_InstanceID) {
+	return input.unpack_full(vertex_id, instance_id, identity_matrix, identity_matrix);
+}
+
+[[vk::binding(0)]] Texture2D texture;
+[[vk::binding(1)]] SamplerState sample;
+
+[[shader("fragment")]]
+stylizer::fragment_output_with_depth fragment(stylizer::vertex_to_fragment input) {
+	return {texture.Sample(sample, input.uv), 0};
+})_";
+		skyMat = stylizer::material::create_from_source_for_geometry_buffer(context, slang, {
+			{stylizer::api::shader::stage::Vertex, "vertex"},
+			{stylizer::api::shader::stage::Fragment, "fragment"},
+		}, gbuffer);
+	}
+	skyMat.textures.emplace_back(stylizer::img::load("../examples/resources/symmetrical_garden_02_1k.hdr")
+		.upload(context, {.usage = stylizer::api::usage::TextureBinding | stylizer::api::usage::CopySource})
+		.generate_mipmaps(context)
+		.configure_sampler(context, {.magnify_linear = true, .minify_linear = true, .mip_linear = true}) // Trilinear
+		.move()
+	);
+	auto skyplane = stylizer::core::model::fullscreen(context, skyMat);
+
+	stylizer::time time;
+	stylizer::auto_release utility_buffer = time.update_utility_buffer(context);
 	while(!window.should_close(context)) {
+		utility_buffer = time.calculate().update_utility_buffer(context, utility_buffer);
+
 		auto draw = gbuffer.begin_drawing(context, stylizer::float3{.1, .3, .5}); {
 			obj.draw(draw);
+			skyplane.draw(draw);
 		} draw.one_shot_submit();
 
 		window.present(context, gbuffer.color);

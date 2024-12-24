@@ -5,10 +5,7 @@
 #include "optional.h"
 #include "maybe_owned.hpp"
 
-#include "stylizer/api/api.hpp"
-#include "stylizer/api/webgpu/bind_group.hpp"
 #include "thirdparty/thread_pool.hpp"
-#include <concepts>
 #include <cstring>
 
 namespace stylizer {
@@ -274,14 +271,148 @@ namespace stylizer {
 
 
 //////////////////////////////////////////////////////////////////////
+// # Utility Data
+//////////////////////////////////////////////////////////////////////
+
+
+	#include "utility_data.partial.hpp"
+
+	struct time: public time_gpu_data {
+		inline time& calculate_only_delta() {
+			static auto last = std::chrono::steady_clock::now();
+
+			auto now = std::chrono::steady_clock::now();
+			delta = std::chrono::duration_cast<std::chrono::microseconds>(now - last).count() / 1'000'000.0;
+
+			last = now;
+			return *this;
+		}
+
+		inline time& calculate() {
+			calculate_only_delta();
+
+			since_start += delta;
+
+			constexpr static float alpha = .9;
+			if(std::abs(average_delta) < 2 * std::numeric_limits<float>::epsilon()) average_delta = delta;
+			average_delta = average_delta * alpha + delta * (1 - alpha);
+			return *this;
+		}
+
+		STYLIZER_API_TYPE(buffer) update_utility_buffer(context& ctx, optional<STYLIZER_API_TYPE(buffer)> utility_buffer = {}) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer) {
+				std::vector<std::byte> zeroData(minimum_utility_buffer_size, std::byte{0});
+				utility_buffer = ctx.device.create_and_write_buffer(api::usage::Storage, zeroData, 0, "Stylizer Utility Data Buffer");
+			}
+
+			utility_buffer->write<time>(ctx, span_from_value<time>(*this), 0);
+			return *utility_buffer;
+		}
+	};
+
+	struct camera3D: public camera3D_gpu_data {
+		// camera3D& calculate_matrices(uint2 window_size) {
+		// 	view_matrix = float4x4::look_at(position, target_position, up);
+		// 	float right = field_of_view / 2;
+		// 	float top = right * window_size.y / window_size.x;
+		// 	if(orthographic) {
+		// 		projection_matrix = float4x4::orthographic({-right, right, -top, top, near_clip_distance, far_clip_distance}, hlslpp::zclip::t::zero);
+		// 	} else
+		// 		projection_matrix = float4x4::perspective({-right, right, -top, top, near_clip_distance, far_clip_distance}, hlslpp::zclip::t::zero);
+		// 	return *this;
+		// }
+
+		STYLIZER_API_TYPE(buffer) update_utility_buffer(context& ctx, optional<STYLIZER_API_TYPE(buffer)> utility_buffer = {}) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer) {
+				std::vector<std::byte> zeroData(minimum_utility_buffer_size, std::byte{0});
+				utility_buffer = ctx.device.create_and_write_buffer(api::usage::Storage, zeroData, 0, "Stylizer Utility Data Buffer");
+			}
+
+			utility_buffer->write<camera3D>(ctx, span_from_value<camera3D>(*this), 16);
+			return *utility_buffer;
+		}
+	};
+
+	// struct camera2D: public camera2D_gpu_data {
+	// 	camera2D& calculate_matrices(uint2 window_size) {
+	// 		float3 position = {target_position.x, target_position.y, -1};
+	// 		float4 up = {0, 1, 0, 0};
+	// 		up = glm::rotate(glm::identity<glm::mat4x4>(), glm::radians(rotation)/* .radian_value() */, vec3f{0, 0, 1}) * up;
+	// 		if(pixel_perfect) projection_matrix = glm::ortho<float>(0, window_size.x, window_size.y, 0, near_clip_distance, far_clip_distance);
+	// 		else projection_matrix = glm::ortho<float>(0, 1/zoom, 1/zoom, 0, near_clip_distance, far_clip_distance);
+	// 		view_matrix = glm::lookAt<float>(position, position + vec3f{0, 0, 1}, up.xyz());
+	// 		return *this;
+	// 	}
+
+		// STYLIZER_API_TYPE(buffer) update_utility_buffer(context& ctx, optional<STYLIZER_API_TYPE(buffer)> utility_buffer = {}) {
+		// 	// struct utility_data {
+		// 	// 	frame_time_data time; // at byte offset 0
+		// 	// 	float _pad0;
+		// 	// 	camera3D_data camera; // at byte offset 16
+		// 	// 	std::vector<light_data> lights; // at byte offset 208
+		// 	// };
+
+		// 	if(!utility_buffer) {
+		// 		std::vector<std::byte> zeroData(minimum_utility_buffer_size, std::byte{0});
+		// 		utility_buffer = ctx.device.create_and_write_buffer(api::usage::Storage, zeroData, 0, "Stylizer Utility Data Buffer");
+		// 	}
+
+		// 	utility_buffer->write<camera2D>(ctx, span_from_value<camera2D>(*this), 16);
+		// 	return *utility_buffer;
+		// }
+	// };
+
+	struct light: public light_gpu_data {
+
+		static STYLIZER_API_TYPE(buffer) update_utility_buffer(context& ctx, std::span<const light> lights, optional<STYLIZER_API_TYPE(buffer)> utility_buffer = {}, bool skip_resize_copy = false) {
+			// struct utility_data {
+			// 	frame_time_data time; // at byte offset 0
+			// 	float _pad0;
+			// 	camera3D_data camera; // at byte offset 16
+			// 	std::vector<light_data> lights; // at byte offset 208
+			// };
+
+			if(!utility_buffer || (utility_buffer->size() - 208) / sizeof(light_gpu_data) != lights.size()) {
+				std::vector<std::byte> zeroData(208 + sizeof(light) * lights.size(), std::byte{0});
+				auto res = ctx.device.create_and_write_buffer(api::usage::Storage, zeroData, 0, "Stylizer Utility Data Buffer");
+				if(!skip_resize_copy && utility_buffer)
+					res.copy_from(ctx, *utility_buffer);
+				if(utility_buffer) utility_buffer->release();
+				utility_buffer = res;
+			}
+
+			utility_buffer->write<light>(ctx, lights, 208);
+			return *utility_buffer;
+		}
+		STYLIZER_API_TYPE(buffer) update_utility_buffer(context& ctx, optional<STYLIZER_API_TYPE(buffer)> utility_buffer = {}, bool skip_resize_copy = false) {
+			return update_utility_buffer(ctx, span_from_value(*this), utility_buffer, skip_resize_copy);
+		}
+	};
+
+
+//////////////////////////////////////////////////////////////////////
 // # Mesh
 //////////////////////////////////////////////////////////////////////
 
 
 	struct gpu_mesh {
 		STYLIZER_API_TYPE(buffer) vertex_buffer, index_buffer = {};
-		api::buffer& get_vertex_buffer() { return vertex_buffer; }
-		api::buffer& get_index_buffer() { return index_buffer; }
+		STYLIZER_API_TYPE(buffer)& get_vertex_buffer() { return vertex_buffer; }
+		STYLIZER_API_TYPE(buffer)& get_index_buffer() { return index_buffer; }
 
 		operator bool() const { return vertex_buffer || index_buffer; }
 
@@ -348,6 +479,19 @@ namespace stylizer {
 				{{{api::render::pipeline::config::vertex_buffer_layout::attribute::format_of<float4>()}}}, // bone_weights
 			};
 			return layout;
+		}
+
+		static const mesh& fullscreen(context& ctx) {
+			static std::optional<auto_release<mesh>> out{};
+			if(!out) {
+				out = mesh{};
+				out->vertex_count = 3;
+				out->triangle_count = 1;
+				out->positions = std::vector<float4>{float4(-1, -3, .99, 1), float4(3, 1, .99, 1), float4(-1, 1, .99, 1)};
+				out->uvs = std::vector<float4>{float4(0, 2, 0, 0), float4(2, 0, 0, 0), float4(0)};
+				out->upload(ctx);
+			}
+			return *out;
 		}
 
 		struct metadata {
@@ -421,6 +565,24 @@ namespace stylizer {
 			};
 		}
 
+		std::vector<float> linearize(metadata* gpu_metadata = nullptr) {
+			std::vector<float> out; out.reserve((gpu_metadata ? sizeof(metadata) / 4 : 0) + positions.size() * 8);
+			if(gpu_metadata) {
+				std::copy((float*)gpu_metadata, (float*)(gpu_metadata + 1), std::back_inserter(out));
+				for(size_t i = 0, pad = out.size() % (sizeof(float4) / 4); i < pad; ++i)
+					out.push_back(0);
+			}
+			std::copy((float*)positions.begin().base(), (float*)positions.end().base(), std::back_inserter(out));
+			if(normals) std::copy((float*)normals->begin().base(), (float*)normals->end().base(), std::back_inserter(out));
+			if(tangents) std::copy((float*)tangents->begin().base(), (float*)tangents->end().base(), std::back_inserter(out));
+			if(uvs) std::copy((float*)uvs->begin().base(), (float*)uvs->end().base(), std::back_inserter(out));
+			if(cta) std::copy((float*)cta->begin().base(), (float*)cta->end().base(), std::back_inserter(out));
+			if(colors) std::copy((float*)colors->begin().base(), (float*)colors->end().base(), std::back_inserter(out));
+			if(bones) std::copy((float*)bones->begin().base(), (float*)bones->end().base(), std::back_inserter(out));
+			if(bone_weights) std::copy((float*)bone_weights->begin().base(), (float*)bone_weights->end().base(), std::back_inserter(out));
+			return out;
+		}
+
 		mesh& upload(context& ctx) {
 			assert(!positions.empty());
 
@@ -429,19 +591,7 @@ namespace stylizer {
 			size_t attribute_size = metadata.vertex_count * sizeof(float4);
 
 			if(vertex_buffer) vertex_buffer.release();
-			vertex_buffer = ctx.device.create_buffer(api::usage::Vertex, metadata.vertex_buffer_size, true, "Stylizer Vertex Buffer");
-			auto mapped = vertex_buffer.get_mapped_range(true);
-
-			std::memcpy(mapped, &gpu_metadata, sizeof(metadata));
-			std::memcpy(mapped + metadata.position_start, positions.data(), attribute_size);
-			if(normals) std::memcpy(mapped + metadata.normals_start, normals->data(), attribute_size);
-			if(tangents) std::memcpy(mapped + metadata.tangents_start, tangents->data(), attribute_size);
-			if(uvs) std::memcpy(mapped + metadata.uvs_start, uvs->data(), attribute_size);
-			if(cta) std::memcpy(mapped + metadata.cta_start, cta->data(), attribute_size);
-			if(colors) std::memcpy(mapped + metadata.colors_start, colors->data(), attribute_size);
-			if(bones) std::memcpy(mapped + metadata.bones_start, bones->data(), attribute_size);
-			if(bone_weights) std::memcpy(mapped + metadata.bone_weights_start, bone_weights->data(), attribute_size);
-			vertex_buffer.unmap();
+			vertex_buffer = ctx.device.create_and_write_buffer(api::usage::Vertex, byte_span<float>(linearize(&gpu_metadata)), 0, "Stylizer Vertex Buffer");
 
 			if(indices) {
 				if(index_buffer) index_buffer.release();
@@ -453,8 +603,8 @@ namespace stylizer {
 
 	struct transformed_gpu_mesh {
 		STYLIZER_API_TYPE(buffer) vertex_buffer_transformed, index_buffer_transformed = {};
-		api::buffer& get_vertex_buffer() { return vertex_buffer_transformed; }
-		api::buffer& get_index_buffer() { return index_buffer_transformed; }
+		STYLIZER_API_TYPE(buffer)& get_vertex_buffer() { return vertex_buffer_transformed; }
+		STYLIZER_API_TYPE(buffer)& get_index_buffer() { return index_buffer_transformed; }
 
 		operator bool() const { return vertex_buffer_transformed || index_buffer_transformed; }
 
@@ -500,6 +650,12 @@ namespace stylizer {
 
 		static std::pair<std::vector<maybe_owned_t<STYLIZER_API_TYPE(shader)>>, api::pipeline::entry_points> process_shaders(context& ctx, std::string_view content, const entry_points& eps, std::string_view module = "generated") {
 			inject_default_virtual_filesystem();
+
+			if(module == "generated") {
+				static size_t counter = 0;
+				static thread_local std::string static_module;
+				module = (static_module = module) += std::to_string(++counter);
+			}
 
 			std::vector<maybe_owned_t<STYLIZER_API_TYPE(shader)>> shaders; shaders.reserve(eps.size());
 			api::pipeline::entry_points api;
@@ -632,6 +788,15 @@ namespace stylizer {
 			for(auto& [mesh, material]: material_mapped_meshes)
 				if(mesh.owned() || material.owned()) return true;
 			return false;
+		}
+
+		static model fullscreen(context& ctx, optional<Tmaterial&> material = {}) {
+			auto& mesh = Tmesh::fullscreen(ctx);
+
+			model out;
+			out.default_material = material ? &material.value : nullptr;
+			out.material_mapped_meshes.emplace(const_cast<Tmesh*>(&mesh), nullptr);
+			return out;
 		}
 
 		model& draw_instanced(drawing_state& draw, std::span<const instance_data> instances) {

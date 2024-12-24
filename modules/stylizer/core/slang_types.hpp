@@ -1,5 +1,6 @@
+#include "hlsl++/matrix_float_type.h"
+#define HLSLPP_FEATURE_TRANSFORM
 #include "hlsl++.h"
-#include "hlsl++/vector_float_type.h"
 #include "stylizer/api/api.hpp"
 
 namespace stylizer {

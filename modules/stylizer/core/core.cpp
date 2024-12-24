@@ -16,7 +16,7 @@ namespace stylizer {
 			auto session = get_session();
 
 			slcross::slang::inject_module_from_memory(session, b::embed<"shaders/embeded/stylizer.slang">().str(), "stylizer.slang", "stylizer");
-			slcross::slang::inject_module_from_memory(session, b::embed<"shaders/embeded/stylizer.default.slang">().str(), "stylizer.default.slang", "stylizer_default");
+			slcross::slang::inject_module_from_memory(session, b::embed<"shaders/embeded/stylizer.core.slang">().str(), "stylizer.core.slang", "stylizer_core");
 
 			return true;
 		}();
