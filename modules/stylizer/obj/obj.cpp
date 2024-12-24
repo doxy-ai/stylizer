@@ -89,7 +89,7 @@ namespace stylizer::obj {
 		}
 
 		core::model out;
-		out.transform = float4x4::identity();
+		out.transform = identity_matrix;
 		for(auto& mesh: meshes)
 			out.material_mapped_meshes.emplace(std::move(ctx ? mesh.upload(ctx) : mesh), nullptr);
 		return out;
