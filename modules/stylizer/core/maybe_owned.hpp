@@ -5,13 +5,6 @@ namespace stylizer {
 	struct maybe_owned_t: public std::variant<T, T*> {
 		using super = std::variant<T, T*>;
 		using super::super;
-		// maybe_owned_t() : super(nullptr) {}
-		// maybe_owned_t(T* ptr) : super(ptr) {}
-		// maybe_owned_t(T&& ref) : super(std::move(ref)) {}
-		// maybe_owned_t(const maybe_owned_t&) = default;
-		// maybe_owned_t(maybe_owned_t&&) = default;
-		// maybe_owned_t& operator=(const maybe_owned_t&) = default;
-		// maybe_owned_t& operator=(maybe_owned_t&&) = default;
 
 		T& get() {
 			if(this->index() == 0)

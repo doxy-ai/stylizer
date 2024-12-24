@@ -1,6 +1,5 @@
 #pragma once
 
-#include "stylizer/api/api.hpp"
 #include <stylizer/core/core.hpp>
 
 #include <filesystem>
