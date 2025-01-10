@@ -55,7 +55,7 @@ fragment_output fragment(vertex_output input) {
 			obj.draw(draw);
 		} draw.one_shot_submit();
 
-		context.present(gbuffer.color);
+		window.present(context, gbuffer.color);
 	}
 
 	context.release(true);
