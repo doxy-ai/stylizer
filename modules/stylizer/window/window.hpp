@@ -43,6 +43,7 @@ namespace stylizer {
 	struct window {
 		using create_config = window_create_config;
 
+		STYLIZER_API_TYPE(surface) surface;
 		GLFWwindow* window_ = nullptr;
 		event<window&, uint2> resized;
 
@@ -68,31 +69,22 @@ namespace stylizer {
 		context create_context(const api::device::create_config& config = {});
 #endif
 
-		api::surface::config determine_optimal_config(context& ctx, stylizer::api::surface& surface) const {
-			return surface.determine_optimal_config(ctx.device, api::convert(get_size()));
-		}
-		api::surface::config determine_optimal_config(context& ctx) const {
-			return determine_optimal_config(ctx, ctx.surface);
+		api::surface::config determine_optimal_config(context& ctx) {
+			return surface.determine_optimal_config(ctx, api::convert(get_size()));
 		}
 
-		inline window& configure_surface(context& ctx, api::surface::config config, stylizer::api::surface& surface) const {
+		inline window& configure_surface(context& ctx, api::surface::config config) {
 			config.size = api::convert(get_size());
 			surface.configure(ctx, config);
 			return *const_cast<window*>(this);
 		}
-		inline window& configure_surface(context& ctx, api::surface::config config = {}) const {
-			return configure_surface(ctx, config, ctx.surface);
-		}
 
-		window& reconfigure_surface_on_resize(context& ctx, api::surface::config config, stylizer::api::surface& surface) {
-			resized.emplace_back([&surface, &ctx, config](window&, uint2 new_size) mutable {
+		window& reconfigure_surface_on_resize(context& ctx, api::surface::config config = {}) {
+			resized.emplace_back([this, &ctx, config](window&, uint2 new_size) mutable {
 				config.size = api::convert(new_size);
 				surface.configure(ctx, config);
 			});
-			return configure_surface(ctx, config, surface);
-		}
-		window& reconfigure_surface_on_resize(context& ctx, api::surface::config config = {}) {
-			return reconfigure_surface_on_resize(ctx, config, ctx.surface);
+			return configure_surface(ctx, config);
 		}
 
 		window& auto_resize_geometry_buffer(context& ctx, geometry_buffer& gbuffer) {
@@ -100,6 +92,24 @@ namespace stylizer {
 				gbuffer.resize(ctx, new_size);
 			});
 			return *this;
+		}
+
+		window& present(context& ctx) { 
+			auto backup = std::exchange(ctx.surface, &surface);
+			ctx.present();
+			ctx.surface = backup;
+			return *this;
+		}
+		window& present(context& ctx, const api::texture& texture) {
+			auto backup = std::exchange(ctx.surface, &surface);
+			ctx.present(texture);
+			ctx.surface = backup;
+			return *this;
+		}
+
+		void release() {
+			surface.release();
+			window::~window();
 		}
 	};
 
