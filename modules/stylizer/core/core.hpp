@@ -108,8 +108,8 @@ namespace stylizer {
 		static context null;
 
 		STYLIZER_API_TYPE(device) device;
-		STYLIZER_API_TYPE(surface) surface;
-		operator bool() { return device || surface; }
+		STYLIZER_API_TYPE(surface)* surface = nullptr;
+		operator bool() { return device || (surface && *surface); }
 		operator stylizer::api::device&() { // Automatically convert to an API device!
 			assert(device);
 			return device;
@@ -120,21 +120,30 @@ namespace stylizer {
 			config.compatible_surface = surface ? &surface.value : nullptr;
 			context out = {};
 			out.device = stylizer::api::current_backend::device::create_default(config);
-			if(surface) out.surface = std::move(*surface);
+			if(surface && *surface) out.surface = &*surface;
 			return out;
 		}
 #endif
 
-		void process_events() { device.process_events(); }
-		void present() { surface.present(device); }
-		void present(const api::texture& texture) {
+		context& process_events() { 
+			device.wait(false);
+			return *this; 
+		}
+
+		context& present() { 
+			assert(surface);
+			surface->present(device);
+			return *this;
+		}
+		context& present(const api::texture& texture) {
 			stylizer::auto_release surface_texture = get_surface_texture();
 			surface_texture.blit_from(*this, texture);
-			present();
+			return present();
 		}
 
 		texture get_surface_texture() {
-			auto tmp = surface.next_texture(device);
+			assert(surface);
+			auto tmp = surface->next_texture(device);
 			return std::move((texture&)tmp);
 		}
 		drawing_state begin_drawing_to_surface(float4 clear_color, bool one_shot = true) {
@@ -146,7 +155,6 @@ namespace stylizer {
 
 		void release(bool static_sub_objects = false) {
 			device.release(static_sub_objects);
-			surface.release();
 		}
 	};
 

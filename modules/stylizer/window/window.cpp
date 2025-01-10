@@ -85,7 +85,7 @@ namespace stylizer {
 #ifndef STYLIZER_USE_ABSTRACT_API
 	context window::create_context(const api::device::create_config& config /* = {} */) {
 		auto partial = context::create_default(config);
-		partial.surface = api::glfw::create_surface<api::current_backend::surface>(window_);
+		partial.surface = &(surface = api::glfw::create_surface<api::current_backend::surface>(window_));
 		return partial;
 	}
 #endif
