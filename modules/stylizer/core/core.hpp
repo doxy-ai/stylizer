@@ -6,54 +6,17 @@
 #include "optional.h"
 #include "maybe_owned.hpp"
 
-#include "thirdparty/thread_pool.hpp"
+#include <stylizer/hardware/thread_pool.hpp>
+#include <stylizer/hardware/exceptions.hpp>
+
 #include <cstring>
 
 namespace stylizer {
-
-
-#ifndef STYLIZER_NO_EXCEPTIONS
-	struct error: public std::runtime_error {
-		using std::runtime_error::runtime_error;
-	};
-
-	#define STYLIZER_THROW(x) throw error(x)
-#else
-	#define STYLIZER_THROW(x) assert((x, false))
-#endif
-
 
 	using buffer = STYLIZER_API_TYPE(buffer);
 
 
 	static constexpr size_t buffer_alignment = 256;
-
-
-//////////////////////////////////////////////////////////////////////
-// # Thread Pool
-//////////////////////////////////////////////////////////////////////
-
-
-	struct STYLIZER_PREFIXED(thread_pool_future) : std::future<void> {};
-
-	struct thread_pool {
-	protected:
-		static ZenSepiol::ThreadPool& get_thread_pool(optional<size_t> initial_pool_size = {})
-#ifdef IS_STYLIZER_CORE_CPP
-		{
-			static ZenSepiol::ThreadPool pool(initial_pool_size ? *initial_pool_size : std::thread::hardware_concurrency() - 1);
-			return pool;
-		}
-#else
-		;
-#endif
-
-	public:
-		template <typename F, typename... Args>
-		static auto enqueue(F&& function, optional<size_t> initial_pool_size = {}, Args&&... args) {
-			return get_thread_pool(initial_pool_size).AddTask(function, args...);
-		}
-	};
 
 
 //////////////////////////////////////////////////////////////////////

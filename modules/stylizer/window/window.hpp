@@ -2,7 +2,7 @@
 
 #include <stylizer/core/core.hpp>
 
-struct GLFWwindow;
+struct SDL_Window;
 
 namespace stylizer {
 
@@ -44,7 +44,10 @@ namespace stylizer {
 		using create_config = window_create_config;
 
 		STYLIZER_API_TYPE(surface) surface;
-		GLFWwindow* window_ = nullptr;
+		SDL_Window* window_ = nullptr;
+
+		size_t callback_id = -1;
+		bool should_close_ = false;
 		event<window&, uint2> resized;
 
 		window() {}
@@ -107,10 +110,7 @@ namespace stylizer {
 			return *this;
 		}
 
-		void release() {
-			surface.release();
-			window::~window();
-		}
+		void release();
 	};
 
 	template<>
