@@ -4,7 +4,7 @@ add_subdirectory(thirdparty/glm)
 add_subdirectory(thirdparty/embed)
 
 add_library(stylizer_core core.cpp)
-target_link_libraries(stylizer_core PUBLIC stylizer::api glm::glm)
+target_link_libraries(stylizer_core PUBLIC stylizer::api stylizer::hardware glm::glm)
 target_include_directories(stylizer_core PUBLIC ../../)
 add_library(stylizer::core ALIAS stylizer_core)
 

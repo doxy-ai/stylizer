@@ -7,3 +7,6 @@
 [submodule "modules/stylizer/core/thirdparty/embed"]
 	path = modules/stylizer/core/thirdparty/embed
 	url = https://github.com/batterycenter/embed.git
+[submodule "modules/stylizer/hardware"]
+	path = modules/stylizer/hardware
+	url = https://github.com/doxy-ai/stylizer.hardware.git

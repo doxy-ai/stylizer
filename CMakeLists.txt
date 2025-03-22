@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
 
 add_subdirectory(modules/stylizer/api)
+add_subdirectory(modules/stylizer/hardware)
 add_subdirectory(modules/stylizer/core)
 add_subdirectory(modules/stylizer/img)
 add_subdirectory(modules/stylizer/obj)

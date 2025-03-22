@@ -3,57 +3,19 @@
 #include "config.hpp"
 #include "glm/matrix.hpp"
 #include "slang_types.hpp"
-#include "optional.h"
 #include "maybe_owned.hpp"
 
-#include "thirdparty/thread_pool.hpp"
+#include <stylizer/hardware/thread_pool.hpp>
+#include <stylizer/hardware/exceptions.hpp>
+
 #include <cstring>
 
 namespace stylizer {
-
-
-#ifndef STYLIZER_NO_EXCEPTIONS
-	struct error: public std::runtime_error {
-		using std::runtime_error::runtime_error;
-	};
-
-	#define STYLIZER_THROW(x) throw error(x)
-#else
-	#define STYLIZER_THROW(x) assert((x, false))
-#endif
-
 
 	using buffer = STYLIZER_API_TYPE(buffer);
 
 
 	static constexpr size_t buffer_alignment = 256;
-
-
-//////////////////////////////////////////////////////////////////////
-// # Thread Pool
-//////////////////////////////////////////////////////////////////////
-
-
-	struct STYLIZER_PREFIXED(thread_pool_future) : std::future<void> {};
-
-	struct thread_pool {
-	protected:
-		static ZenSepiol::ThreadPool& get_thread_pool(optional<size_t> initial_pool_size = {})
-#ifdef IS_STYLIZER_CORE_CPP
-		{
-			static ZenSepiol::ThreadPool pool(initial_pool_size ? *initial_pool_size : std::thread::hardware_concurrency() - 1);
-			return pool;
-		}
-#else
-		;
-#endif
-
-	public:
-		template <typename F, typename... Args>
-		static auto enqueue(F&& function, optional<size_t> initial_pool_size = {}, Args&&... args) {
-			return get_thread_pool(initial_pool_size).AddTask(function, args...);
-		}
-	};
 
 
 //////////////////////////////////////////////////////////////////////
@@ -86,7 +48,7 @@ namespace stylizer {
 		using super = STYLIZER_API_NAMESPACE::texture;
 
 		// It is very common to load an image, upload it, and generate it mipmaps all in one chain... this overide allows this chain to be performed without an as cast at the end!
-		inline texture& generate_mipmaps(api::device& device, size_t first_mip_level = 0, std::optional<size_t> mip_levels_override = {}) {
+		inline texture& generate_mipmaps(api::device& device, size_t first_mip_level = 0, optional<size_t> mip_levels_override = {}) {
 			super::generate_mipmaps(device, first_mip_level, mip_levels_override);
 			return *this;
 		}
@@ -208,7 +170,7 @@ namespace stylizer {
 
 	struct geometry_buffer_create_config {
 		STYLIZER_NULLABLE(struct geometry_buffer*) previous = nullptr;
-		texture::format color_format = texture::format::BGRA8_SRGB;
+		texture::format color_format = texture::format::RGBA8srgb;
 		texture::format depth_format = texture::format::Depth24;
 	};
 
@@ -250,7 +212,7 @@ namespace stylizer {
 			static std::array<api::render_pass::color_attachment, 1> out;
 			return out = {api::render_pass::color_attachment{ .texture = &color }};
 		}
-		virtual std::optional<api::render_pass::depth_stencil_attachment> depth_attachment() {
+		virtual optional<api::render_pass::depth_stencil_attachment> depth_attachment() {
 			return {api::render_pass::depth_stencil_attachment{
 				.texture = &depth,
 			}};
@@ -479,16 +441,16 @@ namespace stylizer {
 
 		// Vertex attributes data
 		std::vector<float4> positions;					// Vertex position (xyz) mask 1 (w) (shader-location = 0) NOTE: Not nullable
-		std::optional<std::vector<float4>> normals;		// Vertex normals (xyz) mask 2 (w) (shader-location = 1)
-		std::optional<std::vector<float4>> tangents;	// Vertex tangents (xyz) and sign (w) to compute bitangent (shader-location = 2)
-		std::optional<std::vector<float4>> uvs;			// Vertex texture coordinates (xy) and (zw) (shader-location = 3)
+		optional<std::vector<float4>> normals;		// Vertex normals (xyz) mask 2 (w) (shader-location = 1)
+		optional<std::vector<float4>> tangents;	// Vertex tangents (xyz) and sign (w) to compute bitangent (shader-location = 2)
+		optional<std::vector<float4>> uvs;			// Vertex texture coordinates (xy) and (zw) (shader-location = 3)
 
-		std::optional<std::vector<float4>> cta;			// Vertex curvature (x), thickness (y), and associated faces begin (z) and length (w) (shader-location = 4)
-		std::optional<std::vector<float4>> colors;		// Vertex colors (shader-location = 5)
-		std::optional<std::vector<uint4>> bones;		// Bone IDs (shader-location = 6)
-		std::optional<std::vector<float4>> bone_weights;// Bone weights associated with each ID (shader-location = 7)
+		optional<std::vector<float4>> cta;			// Vertex curvature (x), thickness (y), and associated faces begin (z) and length (w) (shader-location = 4)
+		optional<std::vector<float4>> colors;		// Vertex colors (shader-location = 5)
+		optional<std::vector<uint4>> bones;		// Bone IDs (shader-location = 6)
+		optional<std::vector<float4>> bone_weights;// Bone weights associated with each ID (shader-location = 7)
 
-		std::optional<std::vector<index_t>> indices;	// Vertex indices (in case vertex data comes indexed)
+		optional<std::vector<index_t>> indices;	// Vertex indices (in case vertex data comes indexed)
 
 
 		// Meshes are sorted based on wherever their positions happened to be stored in memory
@@ -515,9 +477,9 @@ namespace stylizer {
 		}
 
 		static const mesh& fullscreen(context& ctx) {
-			static std::optional<auto_release<mesh>> out{};
+			static optional<auto_release<mesh>> out{};
 			if(!out) {
-				out = mesh{};
+				out = {mesh{}};
 				out->vertex_count = 3;
 				out->triangle_count = 1;
 				out->positions = std::vector<float4>{float4(-1, -3, .99, 1), float4(3, 1, .99, 1), float4(-1, 1, .99, 1)};
@@ -719,7 +681,7 @@ namespace stylizer {
 
 		operator bool() const { return pipeline; }
 
-		static material create_from_shaders(context& ctx, const api::pipeline::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const std::optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), const api::render_pipeline::config& config = {}) {
+		static material create_from_shaders(context& ctx, const api::pipeline::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), const api::render_pipeline::config& config = {}) {
 			material out{};
 			out.upload_from_shaders(ctx, entry_points, color_attachments, depth_attachment, vertex_layout, config);
 			return out;
@@ -729,7 +691,7 @@ namespace stylizer {
 			out.upload_from_shaders_for_geometry_buffer(ctx, entry_points, gbuffer, vertex_layout, config);
 			return out;
 		}
-		static material create_from_source(context& ctx, std::string_view content, const shader_processor::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const std::optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), std::string_view module = "generated", const api::render_pipeline::config& config = {}) {
+		static material create_from_source(context& ctx, std::string_view content, const shader_processor::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), std::string_view module = "generated", const api::render_pipeline::config& config = {}) {
 			material out{};
 			out.upload_from_source(ctx, content, entry_points, color_attachments, depth_attachment, vertex_layout, module, config);
 			return out;
@@ -740,7 +702,7 @@ namespace stylizer {
 			return out;
 		}
 
-		material& upload_from_shaders(context& ctx, const api::pipeline::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const std::optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), api::render_pipeline::config config = {}) {
+		material& upload_from_shaders(context& ctx, const api::pipeline::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), api::render_pipeline::config config = {}) {
 			if(!vertex_layout.empty()) config.vertex_buffers = vertex_layout;
 			if(pipeline) pipeline.release();
 			pipeline = ctx.device.create_render_pipeline(entry_points, color_attachments, depth_attachment, config, "Stylizer Default Material Pipeline");
@@ -754,7 +716,7 @@ namespace stylizer {
 			return *this;
 		}
 
-		material& upload_from_source(context& ctx, std::string_view content, const shader_processor::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const std::optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), std::string_view module = "generated", const api::render_pipeline::config& config = {}) {
+		material& upload_from_source(context& ctx, std::string_view content, const shader_processor::entry_points& entry_points, std::span<const api::color_attachment> color_attachments = {}, const optional<api::depth_stencil_attachment>& depth_attachment = {}, const std::vector<api::render::pipeline::config::vertex_buffer_layout>& vertex_layout = mesh::vertex_buffer_layout(), std::string_view module = "generated", const api::render_pipeline::config& config = {}) {
 			auto [shaders, eps] = shader_processor::process_shaders(ctx, content, entry_points, module);
 			release_shaders();
 			this->shaders = std::move(shaders);
@@ -928,7 +890,7 @@ namespace stylizer {
 
 		static image not_found(size_t dimensions = 16) {
 			image img;
-			img.format = api::texture::format::RGBA8;
+			img.format = api::texture::format::RGBA8srgb;
 			img.raw_data = std::vector<api::color8>(dimensions * dimensions);
 			for (size_t i = 0; i < dimensions; ++i) {
 				for (size_t j = 0; j < dimensions; ++j) {
@@ -966,7 +928,7 @@ namespace stylizer {
 			break; case api::texture::format::RGBA32:
 			 	out.raw_data = std::vector<api::color32>(size_each * out.frames);
 				size_each *= sizeof(api::color32);
-			break; case api::texture::format::RGBA8:
+			break; case api::texture::format::RGBA8srgb:
 				out.raw_data = std::vector<api::color8>(size_each * out.frames);
 				size_each *= sizeof(api::color8);
 			break; case api::texture::format::Gray32:

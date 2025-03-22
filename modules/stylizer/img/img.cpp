@@ -19,7 +19,7 @@ namespace stylizer::img {
 		void* end = hdr ? raw_data + (x * y * sizeof(api::color32)) : raw_data + (x * y * sizeof(api::color8));
 		image.raw_data = hdr ? core::image::data_t{std::vector<api::color32>((api::color32*)raw_data, (api::color32*)end)}
 			: core::image::data_t{std::vector<api::color8>((api::color8*)raw_data, (api::color8*)end)};
-		image.format = hdr ? api::texture::format::RGBA32 : api::texture::format::RGBA8;
+		image.format = hdr ? api::texture::format::RGBA32 : api::texture::format::RGBA8srgb;
 		image.size.x = x;
 		image.size.y = y;
 		image.frames = 1;
