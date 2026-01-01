@@ -1,0 +1,3 @@
+[submodule "modules/stylizer/stylizer.api"]
+	path = modules/stylizer/stylizer.api
+	url = https://github.com/doxy-ai/stylizer.api
