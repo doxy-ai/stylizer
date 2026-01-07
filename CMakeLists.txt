@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.21)
+project(stylizer CXX)
+
+set(STYLIZER_MODULES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/modules/stylizer")
+file(GLOB STYLIZER_MODULES_CHILDREN RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${STYLIZER_MODULES_DIR}/*")
+foreach(child ${STYLIZER_MODULES_CHILDREN})
+	if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${child}/CMakeLists.txt")
+		message("Adding Module: ${child}")
+		add_subdirectory("${child}")
+	endif()
+endforeach()
