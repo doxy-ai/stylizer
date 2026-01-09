@@ -44,8 +44,8 @@ IMGUI_IMPL_API stylizer::connection_raw ImGui_ImplStylizerWindow_RegisterEventLi
 #ifdef STYLIZER_SDL3_AVAILABLE
 	case stylizer::sdl::magic_number:
 		return ctx.handle_event.connect([](const stylizer::context::event& e){
-			auto event = dynamic_cast<const stylizer::sdl::event*>(&e);
-			if(event == nullptr) return;
+			auto event = stylizer::sdl::event2sdl(e);
+			if(!event) return;
 
 			ImGui_ImplSDL3_ProcessEvent(&event->sdl);
 		});

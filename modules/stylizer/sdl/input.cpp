@@ -10,8 +10,8 @@ namespace stylizer::sdl {
 			get_global_sdl_event_handler() = setup_sdl_events(ctx);
 
 		ctx.handle_event.connect([this](const context::event& e) {
-			auto event = dynamic_cast<const sdl::event*>(&e);
-			if(event == nullptr) return;
+			auto event = event2sdl(e);
+			if(!event) return;
 
 			process_SDL_event(event->sdl);
 		});
