@@ -19,6 +19,8 @@ add_library(stylizer_imgui ${IMGUI_FILES} high_level.cpp imgui_impl_stylizer_api
 target_include_directories(stylizer_imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 target_link_libraries(stylizer_imgui PUBLIC stylizer::sdl3)
 
+stylizer_embed(stylizer_imgui fonts/InterVariable.ttf)
+
 if(STYLIZER_API_ENABLE_WEBGPU)
 	target_compile_options(stylizer_imgui PUBLIC -DIMGUI_IMPL_WEBGPU_BACKEND_DAWN)
 endif(STYLIZER_API_ENABLE_WEBGPU)
