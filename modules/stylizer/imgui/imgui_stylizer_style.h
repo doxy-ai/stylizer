@@ -1,6 +1,7 @@
 #pragma once
 
 #include <imgui.h>
+#include "battery/embed.hpp"
 
 static constexpr auto ImGuiWindowFlags_Invisible = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar| ImGuiWindowFlags_NoSavedSettings;
 
@@ -84,9 +85,17 @@ namespace stylizer {
 		style.FrameBorderSize  = 1.0f;
 		style.TabBorderSize    = 1.0f;
 
-		return ImGui::GetIO().Fonts->AddFontFromFileTTF("../../font/InterVariable.ttf"); // TODO: How can we embed this?
+		// Content scaling
 		style.ScaleAllSizes(main_scale);        
 		style.FontScaleDpi = main_scale;       
+
+#ifdef STYLIZER_INTER_FONT_AVAILABLE
+		auto font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF((void*)b::embed<"fonts/InterVariable.ttf">().data(), b::embed<"fonts/InterVariable.ttf">().size());
+		font->Sources[0]->FontDataOwnedByAtlas = false;
+		return font;
+#else
+		return nullptr;
+#endif
 	}
 
 }
