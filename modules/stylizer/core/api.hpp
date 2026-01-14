@@ -10,6 +10,71 @@
 
 namespace stylizer {
 
+	struct texture : public api::current_backend::texture {
+		texture() = default;
+		texture(const texture&) = delete; // TODO: Textures should probably be copyable...
+		texture(texture&&) = default;
+		texture& operator=(const texture&) = delete;
+		texture& operator=(texture&&) = default;
+
+		create_config values;
+
+		reaction::Var<stdmath::vector<size_t, 3>> size;
+
+		static texture create(api::device& device, const create_config& config = {}) {
+			texture out;
+			out.values = config;
+			out.size = reaction::var(out.values.size);
+			static_cast<api::current_backend::texture&>(out) = api::current_backend::texture::create(device, config);
+			out.resize = reaction::action([](const stdmath::vector<size_t, 3>& size){
+				// TODO: Create new texture and blit the current texture to it
+			}, out.size);
+			return out;
+		}
+		static texture create_and_write(api::device& device, std::span<const std::byte> data, const data_layout& layout, create_config config = {}) {
+			config.size = { data.size() / layout.rows_per_image / bytes_per_pixel(config.format), layout.rows_per_image, 1 };
+			auto out = create(device, config);
+			out.write(device, data, layout, config.size);
+			return out;
+		}
+
+	protected:
+		reaction::Action<> resize;
+		
+	};	
+
+	struct surface : protected api::current_backend::surface {
+		surface() = default;
+		surface(const surface&) = delete;
+		surface(surface&&) = default;
+		surface& operator=(const surface&) = delete;
+		surface& operator=(surface&&) = default;
+	
+		reaction::Var<stdmath::vector<size_t, 2>> size;
+		reaction::Var<enum present_mode> present_mode; //= surface::present_mode::Fifo;
+		reaction::Var<api::texture_format> texture_format; //= api::texture_format::RGBAu8_NormalizedSRGB;
+		reaction::Var<api::alpha_mode> alpha_mode; //= api::alpha_mode::Opaque;
+		reaction::Var<api::usage> usage; // = api::usage::RenderAttachment;
+		reaction::Var<struct context*> associated_context;
+
+		using api::current_backend::surface::operator bool;
+		using api::current_backend::surface::next_texture;
+
+		surface& present(api::device& device) override {
+			api::current_backend::surface::present(device);
+			return *this;
+		}
+
+		using api::current_backend::surface::release;
+		using api::current_backend::surface::auto_release;
+
+		friend struct window;
+protected:
+		static surface create(context& ctx, api::current_backend::surface& surface, const stdmath::vector<size_t, 2>& size);
+
+		reaction::Action<> resize;
+	};
+
 	struct context : public api::current_backend::device {
 		struct event {
 			virtual ~event() {}
