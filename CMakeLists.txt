@@ -1,6 +1,18 @@
 cmake_minimum_required(VERSION 3.21)
 project(stylizer CXX)
 
+set(STYLIZER_FETCH_REACTIVE true)
+
+include(FetchContent)
+
+if(STYLIZER_FETCH_REACTIVE)
+	FetchContent_Declare(
+		fetch_reactive
+		GIT_REPOSITORY https://github.com/lumia431/reaction.git
+	)
+	FetchContent_MakeAvailable(fetch_reactive)
+endif()
+
 set(STYLIZER_MODULES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/modules/stylizer")
 file(GLOB STYLIZER_MODULES_CHILDREN RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "${STYLIZER_MODULES_DIR}/*")
 foreach(child ${STYLIZER_MODULES_CHILDREN})
