@@ -12,7 +12,7 @@ if (NOT SDL3_FOUND)
     FetchContent_MakeAvailable(SDL3)
 endif()
 
-add_library(stylizer_sdl3 event.cpp)
+add_library(stylizer_sdl3 event.cpp input.cpp)
 target_link_libraries(stylizer_sdl3 PUBLIC stylizer::core)
 
 include(../api/cmake/sdl3.cmake)
