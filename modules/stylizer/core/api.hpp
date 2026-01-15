@@ -4,11 +4,36 @@
 #include <stylizer/api/backends/current_backend.hpp>
 #include <reaction/reaction.h>
 
+#include "backends/webgpu/webgpu.hpp"
+#include "util/maybe_owned.hpp"
+
 #include <chrono>
 #include <cstddef>
 #include <ratio>
 
 namespace stylizer {
+
+	struct context : public api::current_backend::device {
+		struct event {
+			virtual ~event() {}
+		};
+
+		stylizer::signal<void(context&)> process_events;
+		stylizer::signal<void(const event&)> handle_event;
+
+		void update() {
+			process_events(*this);
+		}
+
+		static context create_default(const api::device::create_config& config = {}) {
+			context out;
+			static_cast<api::current_backend::device&>(out) = api::current_backend::device::create_default(config);
+			out.process_events.connect([](context& ctx) {
+				static_cast<api::current_backend::device&>(ctx).process_events();
+			});
+			return out;
+		}
+	};
 
 	struct texture : public api::current_backend::texture {
 		texture() = default;
@@ -63,8 +88,7 @@ namespace stylizer {
 
 	protected:
 		reaction::Action<> resize;
-		
-	};	
+	};
 
 	struct surface : protected api::current_backend::surface {
 		surface() = default;
@@ -72,7 +96,7 @@ namespace stylizer {
 		surface(surface&&) = default;
 		surface& operator=(const surface&) = delete;
 		surface& operator=(surface&&) = default;
-	
+
 		reaction::Var<stdmath::vector<size_t, 2>> size;
 		reaction::Var<enum present_mode> present_mode; //= surface::present_mode::Fifo;
 		reaction::Var<api::texture_format> texture_format; //= api::texture_format::RGBAu8_NormalizedSRGB;
@@ -104,27 +128,44 @@ protected:
 		reaction::Action<> resize;
 	};
 
-	struct context : public api::current_backend::device {
-		struct event {
-			virtual ~event() {}
-		};
+	struct material : public api::current_backend::render::pipeline {
+		material() = default; // TODO: Default materials okay?
+		material(api::current_backend::render::pipeline&& pipeline) 
+			: api::current_backend::render::pipeline(std::move(pipeline)) {}
 
-		stylizer::signal<void(context&)> process_events;
-		stylizer::signal<void(const event&)> handle_event;
+		material(const material&) = default;
+		material(material&) = default;
 
-		void update() {
-			process_events(*this);
+		material& operator=(api::current_backend::render::pipeline&& pipeline) {
+			static_cast<api::current_backend::render::pipeline&>(*this) = std::move(pipeline);
+			return *this;
 		}
+		material& operator=(const material&) = default;
+		material& operator=(material&) = default;
 
-		static context create_default(const api::device::create_config& config = {}) {
-			context out;
-			static_cast<api::current_backend::device&>(out) = api::current_backend::device::create_default(config);
-			out.process_events.connect([](context& ctx) {
-				static_cast<api::current_backend::device&>(ctx).process_events();
-			});
-			return out;
-		}
-	};	
+
+		virtual std::span<const std::byte> config_data() = 0;
+		virtual std::span<maybe_owned<api::current_backend::texture>> textures() = 0;
+		virtual std::span<maybe_owned<api::current_backend::buffer>> buffers() = 0;
+		virtual std::span<std::string_view> requested_mesh_attributes() = 0;
+
+		virtual std::span<api::current_backend::bind_group> bind_groups() = 0;
+	};
+
+	template<typename T>
+	concept material_concept = std::derived_from<T, material> && requires (T t, context ctx, basic_geometry_buffer gbuffer) {
+		{ T::create(ctx, gbuffer) } -> std::convertible_to<T>;
+	};
+
+	inline namespace common_mesh_attributes {
+		constexpr static std::string_view positions = "positions";
+		constexpr static std::string_view normals = "normals";
+		constexpr static std::string_view uvs = "uvs";
+		constexpr static std::string_view texture_coordinates = "uvs"; // alias to uvs
+	}
+
+
+
 
 	struct time {
 		float total = 0, delta = 0, smoothed_delta = 0;
