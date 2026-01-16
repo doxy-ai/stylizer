@@ -33,9 +33,32 @@ namespace stylizer {
 		}
 		static texture create_and_write(api::device& device, std::span<const std::byte> data, const data_layout& layout, create_config config = {}) {
 			config.size = { data.size() / layout.rows_per_image / bytes_per_pixel(config.format), layout.rows_per_image, 1 };
+			config.usage |= api::usage::CopyDestination;
 			auto out = create(device, config);
 			out.write(device, data, layout, config.size);
 			return out;
+		}
+
+		static texture& get_default_texture(context& ctx) {
+			static texture global = [](context& ctx) -> texture {
+				std::array<stdmath::vector<float, 4>, 4> default_texture_data = {{
+					{1, 0, 0, 1},
+					{0, 1, 0, 1},
+					{0, 0, 1, 1},
+					{1, 1, 1, 1}
+				}};
+				auto out = stylizer::texture::create_and_write(ctx, stylizer::byte_span<stdmath::vector<float, 4>>(default_texture_data), stylizer::api::texture::data_layout{
+					.offset = 0,
+					.bytes_per_row = sizeof(default_texture_data[0]) * 2,
+					.rows_per_image = 2,
+				}, {
+					.format = api::texture::format::RGBA32
+				});
+				out.configure_sampler(ctx);
+				return out;
+			}(ctx);
+
+			return global;
 		}
 
 	protected:
@@ -63,6 +86,12 @@ namespace stylizer {
 		surface& present(api::device& device) override {
 			api::current_backend::surface::present(device);
 			return *this;
+		}
+
+		surface& present(context& ctx, texture& color_texture) {
+			stylizer::auto_release texture = next_texture(ctx);
+			texture.blit_from(ctx, color_texture);
+			return present(ctx);
 		}
 
 		using api::current_backend::surface::release;
