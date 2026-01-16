@@ -167,7 +167,7 @@ protected:
 
 
 
-	struct basic_geometry_buffer {
+	struct frame_buffer {
 		reaction::Var<stdmath::vector<size_t, 3>> size;
 		std::optional<stdmath::vector<float, 4>> clear_value = {};
 
@@ -179,8 +179,13 @@ protected:
 			return ctx.create_render_pass(color_attachments(color_template), depth_stencil_attachment(depth_template), one_shot);
 		}
 
+		constexpr static api::depth_stencil_attachment default_draw_to_depth_config {
+			.depth_clear_value = 1,
+			.depth_comparison_function = api::comparison_function::Less
+		};
+
 		template<typename Tfunc>
-		auto&& draw_to(context& ctx, const Tfunc& func, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = {}) {
+		auto&& draw_to(context& ctx, const Tfunc& func, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = default_draw_to_depth_config) {
 			auto pass = create_render_pass(ctx, color_template, depth_template);
 			if constexpr (std::is_same_v<decltype(func(pass)), void>) {
 				func(pass);
@@ -213,16 +218,15 @@ protected:
 		material& operator=(material&) = default;
 
 
-		virtual std::span<const std::byte> config_data() = 0;
-		virtual std::span<maybe_owned<api::current_backend::texture>> textures() = 0;
-		virtual std::span<maybe_owned<api::current_backend::buffer>> buffers() = 0;
+		virtual std::span<maybe_owned<api::current_backend::texture>> textures(context& ctx) = 0;
+		virtual std::span<maybe_owned<api::current_backend::buffer>> buffers(context& ctx) = 0;
 		virtual std::span<std::string_view> requested_mesh_attributes() = 0;
 
-		virtual std::span<api::current_backend::bind_group> bind_groups() = 0;
+		virtual std::span<api::current_backend::bind_group> bind_groups(context& ctx) = 0;
 	};
 
 	template<typename T>
-	concept material_concept = std::derived_from<T, material> && requires (T t, context ctx, basic_geometry_buffer gbuffer) {
+	concept material_concept = std::derived_from<T, material> && requires (T t, context ctx, frame_buffer gbuffer) {
 		{ T::create(ctx, gbuffer) } -> std::convertible_to<T>;
 	};
 
