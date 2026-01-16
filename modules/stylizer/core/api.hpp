@@ -69,6 +69,8 @@ namespace stylizer {
 
 	};
 
+
+
 	struct texture : public api::current_backend::texture {
 		texture() = default;
 		texture(const texture&) = delete; // TODO: Textures should probably be copyable...
@@ -162,9 +164,42 @@ protected:
 		reaction::Action<> resize;
 	};
 
+
+
+
+	struct basic_geometry_buffer {
+		reaction::Var<stdmath::vector<size_t, 3>> size;
+		std::optional<stdmath::vector<float, 4>> clear_value = {};
+
+		virtual texture& color_texture() = 0;
+		virtual std::span<const api::color_attachment> color_attachments(api::color_attachment attachment_template = {}) const = 0;
+		virtual std::optional<api::depth_stencil_attachment> depth_stencil_attachment(api::depth_stencil_attachment attachment_template = {}) const { return {}; }
+
+		virtual api::current_backend::render::pass create_render_pass(context& ctx, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = {}, bool one_shot = true) {
+			return ctx.create_render_pass(color_attachments(color_template), depth_stencil_attachment(depth_template), one_shot);
+		}
+
+		template<typename Tfunc>
+		auto&& draw_to(context& ctx, const Tfunc& func, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = {}) {
+			auto pass = create_render_pass(ctx, color_template, depth_template);
+			if constexpr (std::is_same_v<decltype(func(pass)), void>) {
+				func(pass);
+				pass.one_shot_submit(ctx);
+				return *this;
+			} else {
+				auto out = func(pass);
+				pass.one_shot_submit(ctx);
+				return out;
+			}
+		}
+	};
+
+
+
+
 	struct material : public api::current_backend::render::pipeline {
 		material() = default; // TODO: Default materials okay?
-		material(api::current_backend::render::pipeline&& pipeline) 
+		material(api::current_backend::render::pipeline&& pipeline)
 			: api::current_backend::render::pipeline(std::move(pipeline)) {}
 
 		material(const material&) = default;
