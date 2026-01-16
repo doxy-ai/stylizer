@@ -1,4 +1,4 @@
-add_library(stylizer_model dynamic_mesh.cpp)
+add_library(stylizer_model dynamic_mesh.cpp model.cpp)
 target_link_libraries(stylizer_model PUBLIC stylizer::core)
 target_compile_options(stylizer_model PUBLIC -DSTYLIZER_MODEL_AVAILABLE)
 

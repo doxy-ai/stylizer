@@ -88,8 +88,8 @@ namespace stylizer { inline namespace models {
 		};
 		virtual std::optional<std::span<meshlet>> meshlets_view() = 0;
 
-		stylizer::api::current_backend::buffer index_buffer = {};
-        virtual stylizer::api::current_backend::buffer* get_index_buffer(context& ctx, bool rebuild = false) {
+		api::current_backend::buffer index_buffer = {};
+        virtual api::current_backend::buffer* get_index_buffer(context& ctx, bool rebuild = false) {
 			if(!indicies_view())
 				return nullptr;
 
@@ -111,18 +111,18 @@ namespace stylizer { inline namespace models {
 				return operator()(a) == operator()(b);
 			}
 		};
-		std::unordered_map<std::span<const size_t>, stylizer::api::current_backend::buffer, vertex_buffer_cache_helper, vertex_buffer_cache_helper> vertex_buffer_cache;
-		virtual stylizer::api::current_backend::buffer get_vertex_buffer(context& ctx, std::span<const size_t> attribute_indicies, bool rebuild = false) {
+		std::unordered_map<std::span<const size_t>, std::vector<api::current_backend::buffer>, vertex_buffer_cache_helper, vertex_buffer_cache_helper> vertex_buffer_cache;
+		virtual std::span<api::current_backend::buffer> get_vertex_buffers(context& ctx, std::span<const size_t> attribute_indicies, bool rebuild = false) {
 			if(vertex_buffer_cache.contains(attribute_indicies))
 				return vertex_buffer_cache[attribute_indicies];
 
-			std::vector<std::byte> data;
+			std::vector<api::current_backend::buffer> buffers;
 			for(size_t index : attribute_indicies) {
-				auto attribute_data = attribute_bytes(index);
-				data.insert_range(data.end(), attribute_data);
+				auto data = attribute_bytes(index);
+				buffers.emplace_back(ctx.create_and_write_buffer(api::usage::Vertex, data, 0, "Stylizer Mesh Vertex Buffer"));
 			}
 
-			return vertex_buffer_cache[attribute_indicies] = ctx.create_and_write_buffer(api::usage::Vertex, data, 0, "Stylizer Mesh Vertex Buffer");
+			return vertex_buffer_cache[attribute_indicies] = std::move(buffers);
 		}
 
 		virtual void rebuild_gpu_caches(context& ctx) {
@@ -163,9 +163,14 @@ namespace stylizer { inline namespace models {
 
     struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> {
 
-		void override_materials(material& override_material) {
-			for(auto& [mesh, mat]: *this)
-				mat = &override_material;
-		}
+		void override_materials(material& override_material);
+
+		api::current_backend::render::pass& draw_instanced(
+			context& ctx, api::current_backend::render::pass& render_pass,
+			instance_data::buffer_base& instance_data, std::optional<utility_buffer> util = {}
+		);
+
+		instance_data::buffer<1> instance_data_cache;
+		api::current_backend::render::pass& draw(context& ctx, api::current_backend::render::pass& render_pass, const instance_data& instance_data = {}, std::optional<utility_buffer> util = {});
     };
 }}

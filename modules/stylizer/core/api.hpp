@@ -12,17 +12,19 @@
 #include <ratio>
 
 namespace stylizer {
+	using namespace api::operators;
 
 	struct context : public api::current_backend::device {
 		struct event {
 			virtual ~event() {}
 		};
 
-		stylizer::signal<void(context&)> process_events;
-		stylizer::signal<void(const event&)> handle_event;
+		signal<void(context&)> process_events;
+		signal<void(const event&)> handle_event;
 
-		void update() {
+		context& update() {
 			process_events(*this);
+			return *this;
 		}
 
 		static context create_default(const api::device::create_config& config = {}) {
@@ -33,6 +35,38 @@ namespace stylizer {
 			});
 			return out;
 		}
+
+		connection_raw register_default_error_handler() {
+			auto& errors = get_error_handler();
+			return errors.connect([](api::error::severity severity, std::string_view message, size_t) {
+				if (severity >= api::error::severity::Error)
+					throw api::error(message);
+				std::cerr << message << std::endl;
+			});
+		}
+
+		static context create_default_with_error_handler(const api::device::create_config& config = {}) {
+			context{}.register_default_error_handler();
+			return create_default(config);
+		}
+
+		// TODO: Is there a better name than send?
+		void send(error_severity severity, std::string_view message, size_t error_tag) {
+			get_error_handler()(severity, message, error_tag);
+		}
+		void send_error(std::string_view message, size_t error_tag) {
+			send(error_severity::Error, message, error_tag);
+		}
+		void send_warning(std::string_view message, size_t error_tag) {
+			send(error_severity::Warning, message, error_tag);
+		}
+		void send_info(std::string_view message, size_t error_tag) {
+			send(error_severity::Info, message, error_tag);
+		}
+		void send_verbose(std::string_view message, size_t error_tag) {
+			send(error_severity::Verbose, message, error_tag);
+		}
+
 	};
 
 	struct texture : public api::current_backend::texture {
