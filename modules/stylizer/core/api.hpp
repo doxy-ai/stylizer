@@ -4,12 +4,15 @@
 #include <stylizer/api/backends/current_backend.hpp>
 #include <reaction/reaction.h>
 
+#include <math/matrix.hpp>
+
 #include "backends/webgpu/webgpu.hpp"
 #include "util/maybe_owned.hpp"
 
 #include <chrono>
 #include <cstddef>
 #include <ratio>
+#include <unordered_map>
 
 namespace stylizer {
 	using namespace api::operators;
@@ -239,10 +242,24 @@ protected:
 
 
 
+	struct managed_buffer : public api::current_backend::buffer {
+		virtual std::span<const std::byte> to_bytes() = 0;
+		virtual managed_buffer& upload(context& ctx, std::string_view label = "Stylizer Managed Buffer") {
+			auto bytes = to_bytes();
+			if(!*this || size() < bytes.size()) {
+				auto usage = *this ? this->usage() : api::usage::Storage;
+				static_cast<api::current_backend::buffer&>(*this) = ctx.create_and_write_buffer(usage, bytes, 0, label);
+			} else
+				write(ctx, bytes);
+			return *this;
+		}
+	};
+
+
 
 	struct time {
 		float total = 0, delta = 0, smoothed_delta = 0;
-		size_t frame = 0;
+		uint32_t frame = 0;
 
 		template<typename Tprecision = std::micro, typename Tclock = std::chrono::system_clock>
 		inline time& compute_delta() {
@@ -272,6 +289,96 @@ protected:
 			total += delta;
 			smoothed_delta = alpha * smoothed_delta + (1 - alpha) * delta;
 			return *this;
+		}
+	};
+
+	struct camera {
+		virtual stdmath::matrix<float, 4, 4> view_matrix() const = 0;
+		virtual stdmath::matrix<float, 4, 4> projection_matrix(const stdmath::vector<size_t, 2>& screen_size) const = 0;
+
+		virtual stdmath::matrix<float, 4, 4> inverse_view_matrix() const {
+			return inverse(view_matrix());
+		}
+		virtual stdmath::matrix<float, 4, 4> inverse_projection_matrix(const stdmath::vector<size_t, 2>& screen_size) const {
+			return inverse(projection_matrix(screen_size));
+		}
+	};
+
+	struct concrete_camera : public camera {
+		stdmath::matrix<float, 4, 4> view, projection;
+		stdmath::matrix<float, 4, 4> inverse_view, inverse_projection;
+
+		static concrete_camera from_camera(const camera& camera, const stdmath::vector<size_t, 2>& screen_size) {
+			concrete_camera out;
+			out.view = camera.view_matrix();
+			out.projection = camera.projection_matrix(screen_size);
+			out.inverse_view = camera.inverse_view_matrix();
+			out.inverse_projection = camera.inverse_projection_matrix(screen_size);
+			return out;
+		}
+
+		stdmath::matrix<float, 4, 4> view_matrix() const override { return view; }
+		stdmath::matrix<float, 4, 4> projection_matrix(const stdmath::vector<size_t, 2>& screen_size = {}) const override { return projection; }
+		stdmath::matrix<float, 4, 4> inverse_view_matrix() const override { return inverse_view; }
+		stdmath::matrix<float, 4, 4> inverse_projection_matrix(const stdmath::vector<size_t, 2>& screen_size = {}) const override { return inverse_projection; }
+	};
+
+	struct utility_buffer : public managed_buffer {
+		concrete_camera camera;
+		struct time time;
+
+		std::span<const std::byte> to_bytes() override {
+			// NOTE: concrete camera has a vtable so its uploadable data starts at camera.view
+			return {(std::byte*)&camera.view, ((std::byte*)&time) - ((std::byte*)&camera.view) + sizeof(time)};
+		}
+
+		utility_buffer& update(context& ctx, float alpha = .9) {
+			time.update(alpha);
+			upload(ctx, "Stylizer Utility Buffer");
+			return *this;
+		}
+	};
+
+	struct instance_data {
+		stdmath::matrix<float, 4, 4> model = stdmath::matrix<float, 4, 4>::identity();
+
+		struct buffer_base : public managed_buffer {
+			virtual size_t count() const = 0;
+
+			std::unordered_map<utility_buffer*, api::current_backend::bind_group> group_cache;
+
+			api::current_backend::bind_group make_bind_group(context& ctx,api::current_backend::render_pipeline& pipeline, std::optional<utility_buffer> util = {}, size_t index = 0, size_t minimum_util_size = 272) {
+				utility_buffer* cacher = util ? &*util : nullptr;
+				if(group_cache.contains(cacher)) return group_cache[cacher];
+
+				std::array<api::bind_group::binding, 2> bindings;
+				bindings[0] = api::bind_group::buffer_binding{&*this};
+				if(util) bindings[1] = api::bind_group::buffer_binding{&*util};
+				else bindings[1] = api::bind_group::buffer_binding{&ctx.get_zero_buffer_singleton(api::usage::Storage, minimum_util_size)};
+				return group_cache[cacher] = pipeline.create_bind_group(ctx, index, bindings);
+			}
+		};
+
+		template<size_t N = std::dynamic_extent>
+		struct buffer : public buffer_base, public std::array<instance_data, N> {
+			using base = instance_data::buffer_base;
+
+			size_t count() const override { return N; }
+
+			std::span<const std::byte> to_bytes() override {
+				return byte_span<instance_data>(static_cast<std::array<instance_data, N>&>(*this));
+			}
+		};
+	};
+
+	template<>
+	struct instance_data::buffer<std::dynamic_extent> : public instance_data::buffer_base, public std::vector<instance_data> {
+		using base = instance_data::buffer_base;
+
+		size_t count() const override { return std::vector<instance_data>::size(); }
+
+		std::span<const std::byte> to_bytes() override {
+			return byte_span<instance_data>(static_cast<std::vector<instance_data>&>(*this));
 		}
 	};
 
