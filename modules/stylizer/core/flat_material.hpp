@@ -82,7 +82,7 @@ varryings vertex(vertex_input vert, uint instance_id : SV_InstanceID) {
 	var util = utils[0];
 	var instance = instances[instance_id];
 	var MVP = mul(util.camera.projection, mul(util.camera.view, instance.model));
-	return { mul(MVP, float4(vert.pos, 1.0)), vert.uv };
+	return { mul(MVP, float4(vert.pos, 1.0)), float2(vert.uv.x, 1 - vert.uv.y) }; // TODO: Why is the v axis inverted!?!?
 }
 
 float4 srgb_to_linear(float4 c) {
