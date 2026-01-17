@@ -1,9 +1,24 @@
 #include "api.hpp"
 
-namespace stylizer {
-	void model::override_materials(material& override_material) {
+#include "dynamic_mesh.hpp"
+
+namespace stylizer { inline namespace models {
+	std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& model::get_loader_set() {
+		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>> loaders = []{
+			std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>> out;
+			out[".obj"] = load_tinyobj_model_generic;
+			return out;
+		}();
+		return loaders;
+	}
+	maybe_owned<model> model::load(context& ctx, std::filesystem::path file) {
+		return load_file(ctx, file, get_loader_set()[file.extension().string()]);
+	}
+
+	model& model::override_materials(material& override_material) {
 		for(auto& [mesh, mat]: *this)
 			mat = &override_material;
+		return *this;
 	}
 
 	api::current_backend::render::pass& model::draw_instanced(
@@ -44,4 +59,9 @@ namespace stylizer {
 
 		return draw_instanced(ctx, render_pass, instance_data_cache, util);
 	}
-}
+
+	maybe_owned<model> load_tinyobj_model_generic(stylizer::context& ctx, std::span<std::byte> memory, std::string_view extension /* = {} */) {
+		auto out = load_tinyobj_model(ctx, memory);
+		return maybe_owned<model>::make_owned_and_move(out);
+	}
+}}

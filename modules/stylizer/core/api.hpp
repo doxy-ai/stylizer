@@ -54,19 +54,19 @@ namespace stylizer {
 		}
 
 		// TODO: Is there a better name than send?
-		void send(error_severity severity, std::string_view message, size_t error_tag) {
+		void send(error_severity severity, std::string_view message, size_t error_tag = 0) {
 			get_error_handler()(severity, message, error_tag);
 		}
-		void send_error(std::string_view message, size_t error_tag) {
+		void send_error(std::string_view message, size_t error_tag = 0) {
 			send(error_severity::Error, message, error_tag);
 		}
-		void send_warning(std::string_view message, size_t error_tag) {
+		void send_warning(std::string_view message, size_t error_tag = 0) {
 			send(error_severity::Warning, message, error_tag);
 		}
-		void send_info(std::string_view message, size_t error_tag) {
+		void send_info(std::string_view message, size_t error_tag = 0) {
 			send(error_severity::Info, message, error_tag);
 		}
-		void send_verbose(std::string_view message, size_t error_tag) {
+		void send_verbose(std::string_view message, size_t error_tag = 0) {
 			send(error_severity::Verbose, message, error_tag);
 		}
 
@@ -123,6 +123,11 @@ namespace stylizer {
 			}(ctx);
 
 			return global;
+		}
+
+		texture& configure_sampler(api::device &device, const sampler_config &config = {}) {
+			api::current_backend::texture::configure_sampler(device, config);
+			return *this;
 		}
 
 	protected:
@@ -229,13 +234,15 @@ protected:
 	};
 
 	template<typename T>
-	concept material_concept = std::derived_from<T, material> && requires (T t, context ctx, frame_buffer gbuffer) {
-		{ T::create(ctx, gbuffer) } -> std::convertible_to<T>;
+	concept material_concept = std::derived_from<T, material> && requires (T t, context ctx, frame_buffer fb) {
+		{ T::create(ctx, fb) } -> std::convertible_to<T>;
 	};
 
 	inline namespace common_mesh_attributes {
 		constexpr static std::string_view positions = "positions";
 		constexpr static std::string_view normals = "normals";
+		constexpr static std::string_view colors = "colors";
+		constexpr static std::string_view vertex_colors = "colors"; // alias to colors
 		constexpr static std::string_view uvs = "uvs";
 		constexpr static std::string_view texture_coordinates = "uvs"; // alias to uvs
 	}
@@ -266,7 +273,7 @@ protected:
 			static auto last_time = Tclock::now();
 			auto now = Tclock::now();
 			auto dt_precise = std::chrono::duration_cast<std::chrono::duration<int64_t, Tprecision>>(now - last_time).count();
-			delta = stdmath::stl::float64_t(dt_precise * Tprecision::num) / Tprecision::den;
+			delta = double(dt_precise * Tprecision::num) / Tprecision::den;
 			last_time = now;
 			return *this;
 		}

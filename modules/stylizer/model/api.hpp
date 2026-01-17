@@ -3,6 +3,9 @@
 #include "type_erased_storage.hpp"
 
 #include <stylizer/core/api.hpp>
+#include <stylizer/core/flat_material.hpp>
+#include <stylizer/core/util/load_file.hpp>
+#include <stylizer/core/util/maybe_owned.hpp>
 
 #include <unordered_map>
 
@@ -111,10 +114,11 @@ namespace stylizer { inline namespace models {
 				return operator()(a) == operator()(b);
 			}
 		};
-		std::unordered_map<std::span<const size_t>, std::vector<api::current_backend::buffer>, vertex_buffer_cache_helper, vertex_buffer_cache_helper> vertex_buffer_cache;
+		std::unordered_map<size_t, std::vector<api::current_backend::buffer>> vertex_buffer_cache;
 		virtual std::span<api::current_backend::buffer> get_vertex_buffers(context& ctx, std::span<const size_t> attribute_indicies, bool rebuild = false) {
-			if(vertex_buffer_cache.contains(attribute_indicies))
-				return vertex_buffer_cache[attribute_indicies];
+			size_t hash = vertex_buffer_cache_helper{}(attribute_indicies);
+			if(vertex_buffer_cache.contains(hash))
+				return vertex_buffer_cache[hash];
 
 			std::vector<api::current_backend::buffer> buffers;
 			for(size_t index : attribute_indicies) {
@@ -122,7 +126,7 @@ namespace stylizer { inline namespace models {
 				buffers.emplace_back(ctx.create_and_write_buffer(api::usage::Vertex, data, 0, "Stylizer Mesh Vertex Buffer"));
 			}
 
-			return vertex_buffer_cache[attribute_indicies] = std::move(buffers);
+			return vertex_buffer_cache[hash] = std::move(buffers);
 		}
 
 		virtual void rebuild_gpu_caches(context& ctx) {
@@ -163,7 +167,25 @@ namespace stylizer { inline namespace models {
 
     struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> {
 
-		void override_materials(material& override_material);
+		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set();
+		static maybe_owned<model> load(context& ctx, std::filesystem::path file);
+
+		model& override_materials(material& override_material);
+
+		model& upload(context& ctx, const frame_buffer& fb) {
+			for(auto& [mesh, material]: *this) {
+				if(mesh.owned) 
+					mesh->rebuild_gpu_caches(ctx);
+
+				if(material.owned) {
+					auto flat_mat = dynamic_cast<flat_material*>(&*material);
+					if(!flat_mat) continue;
+					
+					flat_mat->create_from_configured(ctx, fb);
+				}
+			}
+			return *this;
+		}
 
 		api::current_backend::render::pass& draw_instanced(
 			context& ctx, api::current_backend::render::pass& render_pass,
@@ -173,4 +195,6 @@ namespace stylizer { inline namespace models {
 		instance_data::buffer<1> instance_data_cache;
 		api::current_backend::render::pass& draw(context& ctx, api::current_backend::render::pass& render_pass, const instance_data& instance_data = {}, std::optional<utility_buffer> util = {});
     };
+
+	maybe_owned<model> load_tinyobj_model_generic(stylizer::context& ctx, std::span<std::byte> memory, std::string_view extension);
 }}

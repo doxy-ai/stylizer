@@ -3,7 +3,7 @@
 #include "api.hpp"
 #include <optional>
 
-namespace stylizer {
+namespace stylizer { inline namespace models {
 
 	struct dynamic_mesh : public mesh {
 		std::unordered_map<std::string, size_t> names2index;
@@ -49,4 +49,6 @@ namespace stylizer {
 		bool verify() override;
 	};
 
-}
+	model load_tinyobj_model_with_material(stylizer::context& ctx, std::span<std::byte> memory, std::span<std::byte> mtl);
+	model load_tinyobj_model(stylizer::context& ctx, std::span<std::byte> memory, std::string_view extension = {});
+}}

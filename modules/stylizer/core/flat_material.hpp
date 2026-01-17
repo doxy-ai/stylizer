@@ -7,7 +7,8 @@
 namespace stylizer {
 
 	struct flat_material : public material {
-		std::variant<stdmath::vector<float, 4>, maybe_owned<texture>> color;
+		using color_t = std::variant<stdmath::vector<float, 4>, maybe_owned<texture>>;
+		color_t color;
 		struct config {
 			stdmath::vector<float, 4> color;
 			uint32_t use_texture = false; 
@@ -24,7 +25,7 @@ namespace stylizer {
 		api::current_backend::buffer config_buffer;
 		api::current_backend::bind_group group;
 
-		static flat_material create(context& ctx, const frame_buffer& gbuffer, std::variant<stdmath::vector<float, 4>, maybe_owned<texture>> initial_color) {
+		flat_material& create_from_configured(context& ctx, const frame_buffer& fb) {
 			constexpr static std::string_view source = R"(
 struct time {
 	float total = 0, delta = 0, smoothed_delta = 0;
@@ -69,7 +70,7 @@ struct config {
 
 struct vertex_input {
 	float3 pos : POSITIONS;
-	float2 uv : UVS;
+	float4 uv : UVS;
 }
 
 struct varryings {
@@ -111,8 +112,35 @@ float4 fragment(varryings vert) : SV_Target {
 	return normalize_srgb(color, configs[0].input_srgb(), configs[0].output_srgb());
 	// return float4(231.0/255, 39.0/255, 37.0/255, 1.0) + sample * .001 + color * .001;
 })";
+			config_buffer = ctx.create_and_write_buffer(api::usage::Storage, byte_span<struct config>(span_from_value(config)));
+
+			vertex = ctx.create_shader_from_source(
+				api::shader::language::Slang,
+				api::shader::stage::Vertex,
+				source, "vertex"
+			);
+			fragment = ctx.create_shader_from_source(
+				api::shader::language::Slang,
+				api::shader::stage::Fragment,
+				source, "fragment"
+			);
+
+			static_cast<api::current_backend::render::pipeline&>(*this) = ctx.create_render_pipeline({
+				{api::shader::stage::Vertex, {&vertex, "vertex"}},
+				{api::shader::stage::Fragment, {&fragment, "fragment"}}
+			}, fb.color_attachments(), fb.depth_stencil_attachment(), {
+				.vertex_buffers = {
+					{.attributes = {{.format = api::render::pipeline::config::attribute_format::f32x3}}}, // positions
+					{.attributes = {{.format = api::render::pipeline::config::attribute_format::f32x2}}} // uvs
+				}
+			});
+
+			return *this;
+		}
+
+		static flat_material create(context& ctx, const frame_buffer& fb, const color_t& initial_color) {
 			flat_material out;
-			out.color = std::move(initial_color);
+			out.color = std::move((color_t&)initial_color);
 			bool input_srgb = true;
 			if(std::holds_alternative<stdmath::vector<float, 4>>(out.color))
 				out.config.color = std::get<stdmath::vector<float, 4>>(out.color);
@@ -121,33 +149,10 @@ float4 fragment(varryings vert) : SV_Target {
 				input_srgb = api::is_srgb(std::get<maybe_owned<texture>>(out.color)->texture_format());
 			}
 
-			bool output_srgb = is_srgb(const_cast<frame_buffer&>(gbuffer).color_texture().texture_format());
+			bool output_srgb = is_srgb(const_cast<frame_buffer&>(fb).color_texture().texture_format());
 			((uint32_t&)out.config.srgb) = (input_srgb << 0) | (output_srgb << 1);
 
-			out.config_buffer = ctx.create_and_write_buffer(api::usage::Storage, byte_span<struct config>(span_from_value(out.config)));
-
-			out.vertex = ctx.create_shader_from_source(
-				api::shader::language::Slang,
-				api::shader::stage::Vertex,
-				source, "vertex"
-			);
-			out.fragment = ctx.create_shader_from_source(
-				api::shader::language::Slang,
-				api::shader::stage::Fragment,
-				source, "fragment"
-			);
-
-			static_cast<api::current_backend::render::pipeline&>(out) = ctx.create_render_pipeline({
-				{api::shader::stage::Vertex, {&out.vertex, "vertex"}},
-				{api::shader::stage::Fragment, {&out.fragment, "fragment"}}
-			}, gbuffer.color_attachments(), gbuffer.depth_stencil_attachment(), {
-				.vertex_buffers = {
-					{.attributes = {{.format = api::render::pipeline::config::attribute_format::f32x3}}}, // positions
-					{.attributes = {{.format = api::render::pipeline::config::attribute_format::f32x2}}} // uvs
-				}
-			});
-
-			return std::move(out);
+			return std::move(out.create_from_configured(ctx, fb));
 		}
 
 		virtual std::span<maybe_owned<api::current_backend::texture>> textures(context& ctx) {
