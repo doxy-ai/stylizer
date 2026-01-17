@@ -1,21 +1,35 @@
 #pragma once
 
+#include <cassert>
+#include <concepts>
+#include <span>
 #include <type_traits>
+#include <utility>
 #include <variant>
+#include <vector>
 
 namespace stylizer {
+	namespace detail {
+		template<typename Base, typename Derived>
+		concept base_of = std::derived_from<Derived, Base>;
+	}
+
 	template<typename T>
 	struct maybe_owned {\
 		bool owned = false;
 		T* value;
 
+		static maybe_owned make_owned(T&& moved) { return {new T(std::move(moved)), true}; }
+		static maybe_owned make_owned_and_move(T& will_be_moved) { return make_owned(std::move(will_be_moved)); }
+
 		maybe_owned() : value(nullptr), owned(false) {}
-		maybe_owned(T& ref) : value(&ref), owned(false) {}
-		maybe_owned(T&& moved) : value(new T(std::move(moved))), owned(true) {}
-		maybe_owned(T* ptr) : value(ptr), owned(false) {}
+		maybe_owned(T& ref, bool owned = false) : value(&ref), owned(owned) {}
+		maybe_owned(T&& moved) requires(requires(T a) { {new T(a)}; }) : value(new T(std::move(moved))), owned(true) {}
+		maybe_owned(T* ptr, bool owned = false) : value(ptr), owned(owned) {}
 		maybe_owned(const maybe_owned& o) requires(requires (T a, T b) { {a = b}; }) { *this = o; }
-		maybe_owned(maybe_owned&& o) = default;
+		maybe_owned(maybe_owned&& o)  { *this = std::move(o); }
 		maybe_owned& operator=(const maybe_owned& o) requires(requires (T a, T b) { {a = b}; }) {
+			if(owned) release();
 			if(o.owned)	{
 				owned = true;
 				if constexpr(requires (T t) { { new T(t) }; })
@@ -27,7 +41,17 @@ namespace stylizer {
 			}
 			return *this;
 		}
-		maybe_owned& operator=(maybe_owned&&) = default;
+		maybe_owned& operator=(maybe_owned&& o) {
+			if(owned) release();
+			value = std::exchange(o.value, nullptr);
+			owned = std::exchange(o.owned, false);
+			return *this;
+		}
+
+		template<detail::base_of<T> Tto>
+		maybe_owned<Tto>&& move_as() {
+			return std::move((maybe_owned<Tto>&)*this);
+		}
 
 		void release() {
 			if(owned && value) {

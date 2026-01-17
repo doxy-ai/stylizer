@@ -8,12 +8,12 @@ namespace stylizer {
 	struct manual_material : public material {
 		using material::material;
 
-		static manual_material create(context& ctx, const frame_buffer& gbuffer) {
+		static manual_material create(context& ctx, const frame_buffer& fb) {
 			assert(false && "Manual material should use the create_pipeline function");
 			return {};
 		}
-		static manual_material create_pipeline(context& ctx, const pipeline::entry_points& entry_points, const frame_buffer& gbuffer, const render_pipeline::config& config = {}, const std::string_view label = "Stylizer Manual Material Pipeline") {
-			return {ctx.create_render_pipeline(entry_points, gbuffer.color_attachments(), gbuffer.depth_stencil_attachment(), config, label)};
+		static manual_material create_pipeline(context& ctx, const pipeline::entry_points& entry_points, const frame_buffer& fb, const render_pipeline::config& config = {}, const std::string_view label = "Stylizer Manual Material Pipeline") {
+			return {ctx.create_render_pipeline(entry_points, fb.color_attachments(), fb.depth_stencil_attachment(), config, label)};
 		}
 
 		std::vector<maybe_owned<api::current_backend::texture>> manual_textures;
