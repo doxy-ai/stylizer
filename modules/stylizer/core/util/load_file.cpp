@@ -1,4 +1,5 @@
 #include "load_file.hpp"
+#include "../api.hpp"
 #include <filesystem>
 
 std::unordered_map<std::filesystem::path, mio::mmap_source>& stylizer::get_loaded_files() {
@@ -14,6 +15,8 @@ std::span<std::byte> stylizer::load_file(const std::filesystem::path& f) {
 		return {(std::byte*)mmap.data(), mmap.size()};
 	}
 
-	auto& mmap = get_loaded_files()[file] = file.string();
+	std::error_code ec;
+	auto& mmap = get_loaded_files()[file] = mio::make_mmap_source(file.string(), ec);
+	if(ec) get_error_handler()(stylizer::error_severity::Error, ec.message(), 0);
 	return {(std::byte*)mmap.data(), mmap.size()};
 }
