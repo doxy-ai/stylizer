@@ -7,6 +7,17 @@
 #include <stylizer/core/util/maybe_owned.hpp>
 
 namespace stylizer { inline namespace images {
+	/**
+	 * @brief Represents a CPU-side image resource.
+	 *
+	 * Images can be loaded from files and uploaded to GPU textures.
+	 *
+	 * @code{.cpp}
+	 * // Example: Loading an image and uploading it to a texture
+	 * auto img = stylizer::image::load(ctx, "path/to/image.png");
+	 * auto tex = img->upload(ctx);
+	 * @endcode
+	 */
 	struct image {
 		// For a 2D image the Z dimension is 1
 		// The W dimension is bytes of color data
@@ -15,6 +26,10 @@ namespace stylizer { inline namespace images {
 		using pixel_grid = stdmath::stl::mdspan<Tcolor, stdmath::stl::extents<size_t, stdmath::stl::dynamic_extent, stdmath::stl::dynamic_extent, stdmath::stl::dynamic_extent>>;
 
 		static std::unordered_map<std::string, std::function<maybe_owned<image>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set();
+
+		/**
+		 * @brief Loads an image from a file.
+		 */
 		static maybe_owned<image> load(context& ctx, std::filesystem::path file);
 
 		virtual texture::format get_format() = 0;
@@ -27,6 +42,9 @@ namespace stylizer { inline namespace images {
 			return {bytes.data_handle(), bytes.extent(0)};
 		}
 
+		/**
+		 * @brief Uploads the image data to an existing texture, or creates it if necessary.
+		 */
 		virtual texture& upload(context& ctx, texture& texture, texture::create_config config_template = {}) {
 			auto byte_grid = get_byte_grid();
 			stdmath::vector<size_t, 3> extents = {extent(0), extent(1), extent(2)};
@@ -48,6 +66,10 @@ namespace stylizer { inline namespace images {
 			}, extents);
 			return texture;
 		};
+
+		/**
+		 * @brief Uploads the image data to a newly created texture.
+		 */
 		texture upload(context& ctx, texture::create_config config_template = {}) {
 			texture out;
 			return std::move(upload(ctx, out, config_template));

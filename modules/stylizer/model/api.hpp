@@ -11,6 +11,9 @@
 
 namespace stylizer { inline namespace models {
 
+    /**
+     * @brief Represents a 3D mesh consisting of vertex attributes and optionally indices.
+     */
     struct mesh {
 		enum class Type {
 			Triangle,
@@ -103,20 +106,49 @@ namespace stylizer { inline namespace models {
 		virtual bool verify();
 	};
 
+    /**
+     * @brief Represents a 3D model consisting of multiple meshes and their corresponding materials.
+     *
+     * @code{.cpp}
+     * // Example: Loading and drawing a model
+     * auto my_model = stylizer::model::load(ctx, "path/to/model.obj");
+     * fb.draw_to(ctx, [&](auto& pass) {
+     *     my_model->draw(ctx, pass);
+     * });
+     * @endcode
+     */
     struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> {
 
 		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set();
+
+		/**
+		 * @brief Loads a model from a file.
+		 */
 		static maybe_owned<model> load(context& ctx, std::filesystem::path file);
 
+		/**
+		 * @brief Overrides the materials of all meshes in the model.
+		 */
 		model& override_materials(material& override_material);
+
+		/**
+		 * @brief Uploads all meshes and materials to the GPU.
+		 */
 		model& upload(context& ctx, const frame_buffer& fb);
 
+		/**
+		 * @brief Draws the model using instancing.
+		 */
 		api::current_backend::render::pass& draw_instanced(
 			context& ctx, api::current_backend::render::pass& render_pass,
 			instance_data::buffer_base& instance_data, std::optional<utility_buffer> util = {}
 		);
 
 		instance_data::buffer<1> instance_data_cache;
+
+		/**
+		 * @brief Draws a single instance of the model.
+		 */
 		api::current_backend::render::pass& draw(context& ctx, api::current_backend::render::pass& render_pass, const instance_data& instance_data = {}, std::optional<utility_buffer> util = {});
     };
 

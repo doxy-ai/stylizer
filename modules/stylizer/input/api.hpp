@@ -5,6 +5,19 @@
 
 namespace stylizer {
 
+	/**
+	 * @brief Handles user input from various devices.
+	 *
+	 * Provides a reactive interface for checking keys, mouse position, and other input states.
+	 *
+	 * @code{.cpp}
+	 * // Example: Checking if a key is pressed
+	 * auto& is_space_pressed = input.get_boolean(stylizer::input::key_space);
+	 * auto space_observer = reaction::observe([](bool pressed) {
+	 *     if (pressed) std::cout << "Space pressed!" << std::endl;
+	 * }, is_space_pressed);
+	 * @endcode
+	 */
 	struct input {
 
 		using device_t = size_t;
@@ -411,6 +424,9 @@ namespace stylizer {
 			}, v);
 		}
 
+		/**
+		 * @brief Returns a reactive 2D vector for WASD or arrow key movement.
+		 */
 		auto wasd(bool also_use_arrow_keys = true) {
 			if(also_use_arrow_keys)
 				return buttons_to_vector(
