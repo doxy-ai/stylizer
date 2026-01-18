@@ -17,19 +17,38 @@
 namespace stylizer {
 	using namespace api::operators;
 
+	/**
+	 * @brief High-level application context.
+	 *
+	 * Extends the basic device with event handling, error management, and higher-level abstractions.
+	 *
+	 * @code{.cpp}
+	 * // Example: Creating a context and updating it in a loop
+	 * auto ctx = stylizer::context::create_default();
+	 * while (true) {
+	 *     ctx.update();
+	 * }
+	 * @endcode
+	 */
 	struct context : public api::current_backend::device {
 		struct event {
 			virtual ~event() {}
 		};
 
-		signal<void(context&)> process_events;
-		signal<void(const event&)> handle_event;
+		signal<void(context&)> process_events; ///< Signal emitted to process events.
+		signal<void(const event&)> handle_event; ///< Signal emitted to handle a specific event.
 
+		/**
+		 * @brief Updates the context, triggering event processing.
+		 */
 		context& update() {
 			process_events(*this);
 			return *this;
 		}
 
+		/**
+		 * @brief Creates a default context with the current backend.
+		 */
 		static context create_default(const api::device::create_config& config = {}) {
 			context out;
 			static_cast<api::current_backend::device&>(out) = api::current_backend::device::create_default(config);
@@ -39,6 +58,9 @@ namespace stylizer {
 			return out;
 		}
 
+		/**
+		 * @brief Registers a default error handler that throws on errors and prints to stderr.
+		 */
 		connection_raw register_default_error_handler() {
 			auto& errors = get_error_handler();
 			return errors.connect([](api::error::severity severity, std::string_view message, size_t) {
@@ -48,9 +70,13 @@ namespace stylizer {
 			});
 		}
 
+		/**
+		 * @brief Creates a default context and registers the default error handler.
+		 */
 		static context create_default_with_error_handler(const api::device::create_config& config = {}) {
-			context{}.register_default_error_handler();
-			return create_default(config);
+			context ctx = create_default(config);
+			ctx.register_default_error_handler();
+			return ctx;
 		}
 
 		// TODO: Is there a better name than send?
@@ -74,6 +100,19 @@ namespace stylizer {
 
 
 
+	/**
+	 * @brief High-level texture abstraction.
+	 *
+	 * Extends api::texture with reactive properties and convenience creation methods.
+	 *
+	 * @code{.cpp}
+	 * // Example: Creating a texture and reacting to its size change
+	 * auto tex = stylizer::texture::create(device, {.size = {128, 128, 1}});
+	 * auto size_printer = reaction::observe([](auto size) {
+	 *     std::cout << "Texture size: " << size.x << "x" << size.y << std::endl;
+	 * }, tex.size);
+	 * @endcode
+	 */
 	struct texture : public api::current_backend::texture {
 		texture() = default;
 		texture(const texture&) = delete; // TODO: Textures should probably be copyable...
@@ -81,10 +120,13 @@ namespace stylizer {
 		texture& operator=(const texture&) = delete;
 		texture& operator=(texture&&) = default;
 
-		create_config values;
+		create_config values; ///< The configuration used to create this texture.
 
-		reaction::Var<stdmath::vector<size_t, 3>> size;
+		reaction::Var<stdmath::vector<size_t, 3>> size; ///< Reactive variable for the texture size.
 
+		/**
+		 * @brief Creates a texture.
+		 */
 		static texture create(api::device& device, const create_config& config = {}) {
 			texture out;
 			out.values = config;
@@ -95,6 +137,10 @@ namespace stylizer {
 			}, out.size);
 			return out;
 		}
+
+		/**
+		 * @brief Creates a texture and initializes it with data.
+		 */
 		static texture create_and_write(api::device& device, std::span<const std::byte> data, const data_layout& layout, create_config config = {}) {
 			config.size = { data.size() / layout.rows_per_image / bytes_per_pixel(config.format), layout.rows_per_image, 1 };
 			config.usage |= api::usage::CopyDestination;
@@ -103,6 +149,9 @@ namespace stylizer {
 			return out;
 		}
 
+		/**
+		 * @brief Returns a reference to a default 2x2 checkerboard texture.
+		 */
 		static texture& get_default_texture(context& ctx) {
 			static texture global = [](context& ctx) -> texture {
 				std::array<stdmath::vector<float, 4>, 4> default_texture_data = {{
@@ -134,6 +183,9 @@ namespace stylizer {
 		reaction::Action<> resize;
 	};
 
+	/**
+	 * @brief High-level surface abstraction for presenting images.
+	 */
 	struct surface : protected api::current_backend::surface {
 		surface() = default;
 		surface(const surface&) = delete;
@@ -141,21 +193,27 @@ namespace stylizer {
 		surface& operator=(const surface&) = delete;
 		surface& operator=(surface&&) = default;
 
-		reaction::Var<stdmath::vector<size_t, 2>> size;
-		reaction::Var<enum present_mode> present_mode; //= surface::present_mode::Fifo;
-		reaction::Var<api::texture_format> texture_format; //= api::texture_format::RGBAu8_NormalizedSRGB;
-		reaction::Var<api::alpha_mode> alpha_mode; //= api::alpha_mode::Opaque;
-		reaction::Var<api::usage> usage; // = api::usage::RenderAttachment;
-		reaction::Var<struct context*> associated_context;
+		reaction::Var<stdmath::vector<size_t, 2>> size; ///< Reactive variable for the surface size.
+		reaction::Var<enum present_mode> present_mode; ///< Reactive variable for the present mode.
+		reaction::Var<api::texture_format> texture_format; ///< Reactive variable for the texture format.
+		reaction::Var<api::alpha_mode> alpha_mode; ///< Reactive variable for the alpha mode.
+		reaction::Var<api::usage> usage; ///< Reactive variable for the surface usage.
+		reaction::Var<struct context*> associated_context; ///< The context this surface is associated with.
 
 		using api::current_backend::surface::operator bool;
 		using api::current_backend::surface::next_texture;
 
+		/**
+		 * @brief Presents the next frame.
+		 */
 		surface& present(api::device& device) override {
 			api::current_backend::surface::present(device);
 			return *this;
 		}
 
+		/**
+		 * @brief Blits the color texture to the surface and presents it.
+		 */
 		surface& present(context& ctx, texture& color_texture) {
 			stylizer::auto_release texture = next_texture(ctx);
 			texture.blit_from(ctx, color_texture);
@@ -175,14 +233,20 @@ protected:
 
 
 
+	/**
+	 * @brief Represents a target for rendering operations.
+	 */
 	struct frame_buffer {
-		reaction::Var<stdmath::vector<size_t, 3>> size;
-		std::optional<stdmath::vector<float, 4>> clear_value = {};
+		reaction::Var<stdmath::vector<size_t, 3>> size; ///< Reactive variable for the frame buffer size.
+		std::optional<stdmath::vector<float, 4>> clear_value = {}; ///< Optional clear color.
 
 		virtual texture& color_texture() = 0;
 		virtual std::span<const api::color_attachment> color_attachments(api::color_attachment attachment_template = {}) const = 0;
 		virtual std::optional<api::depth_stencil_attachment> depth_stencil_attachment(api::depth_stencil_attachment attachment_template = {}) const { return {}; }
 
+		/**
+		 * @brief Creates a render pass targetting this frame buffer.
+		 */
 		virtual api::current_backend::render::pass create_render_pass(context& ctx, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = {}, bool one_shot = true) {
 			return ctx.create_render_pass(color_attachments(color_template), depth_stencil_attachment(depth_template), one_shot);
 		}
@@ -192,6 +256,15 @@ protected:
 			.depth_comparison_function = api::comparison_function::Less
 		};
 
+		/**
+		 * @brief Convenience method to draw to this frame buffer using a lambda.
+		 *
+		 * @code{.cpp}
+		 * fb.draw_to(ctx, [&](auto& pass) {
+		 *     // Encoding rendering commands
+		 * });
+		 * @endcode
+		 */
 		template<typename Tfunc>
 		auto&& draw_to(context& ctx, const Tfunc& func, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = default_draw_to_depth_config) {
 			auto pass = create_render_pass(ctx, color_template, depth_template);
@@ -208,8 +281,11 @@ protected:
 	};
 
 
-
-
+	/**
+	 * @brief High-level material abstraction.
+	 *
+	 * Extends api::render_pipeline with associated resources like textures and buffers.
+	 */
 	struct material : public api::current_backend::render::pipeline {
 		material() = default; // TODO: Default materials okay?
 		material(api::current_backend::render::pipeline&& pipeline)
@@ -249,8 +325,14 @@ protected:
 
 
 
+	/**
+	 * @brief A buffer whose GPU storage is managed and can be easily synchronized with CPU data.
+	 */
 	struct managed_buffer : public api::current_backend::buffer {
 		virtual std::span<const std::byte> to_bytes() = 0;
+		/**
+		 * @brief Uploads the CPU data to the GPU buffer, resizing if necessary.
+		 */
 		virtual managed_buffer& upload(context& ctx, std::string_view label = "Stylizer Managed Buffer") {
 			auto bytes = to_bytes();
 			if(!*this || size() < bytes.size()) {
@@ -299,6 +381,9 @@ protected:
 		}
 	};
 
+	/**
+	 * @brief Abstract base class for cameras.
+	 */
 	struct camera {
 		virtual stdmath::matrix<float, 4, 4> view_matrix() const = 0;
 		virtual stdmath::matrix<float, 4, 4> projection_matrix(const stdmath::vector<size_t, 2>& screen_size) const = 0;
