@@ -5,11 +5,25 @@
 
 namespace stylizer {
 
+	/**
+	 * @brief Abstract base class for input handling, providing reactive access to various input devices.
+	 *
+	 * @code
+	 * auto& move = input.wasd();
+	 * auto& fire = input.get_boolean(stylizer::input::key_space);
+	 * @endcode
+	 */
 	struct input {
 
+		/** @brief Type for device identifiers. */
 		using device_t = size_t;
+		/** @brief Constant representing all devices. */
 		static constexpr device_t all_devices = ~0;
 
+		/**
+		 * @brief Updates the internal time for input tracking.
+		 * @param time The current time object.
+		 */
 		virtual void update_time(const time& time) {
 			reaction::batchExecute([&] {
 				get_floating(current_time).value(time.total);
@@ -17,8 +31,13 @@ namespace stylizer {
 			});
 		}
 
+		/**
+		 * @brief Registers this input handler as an event listener in the context.
+		 * @param ctx The stylizer context.
+		 */
 		virtual void register_event_listener(context& ctx) = 0;
 
+		/** @brief Boolean input identifiers (mostly keys). */
 		enum boolean {
 			// From: SDL_keycode.h
 			key_unknown                = 0x00000000u, /**< 0 */
@@ -279,29 +298,61 @@ namespace stylizer {
 			key_rhyper                 = 0x20000007u, /**< Extended key Right Hyper */
 		};
 
+		/**
+		 * @brief Gets a reactive boolean variable for a specific input.
+		 * @param what The input identifier.
+		 * @param devices The device(s) to track.
+		 * @return Reference to the reactive boolean variable.
+		 */
 		virtual reaction::Var<bool>& get_boolean(boolean what, device_t devices = all_devices) = 0;
 
+		/** @brief Floating-point input identifiers. */
 		enum floating {
 			current_time
 		};
 
+		/**
+		 * @brief Gets a reactive floating-point variable for a specific input.
+		 * @param what The input identifier.
+		 * @param devices The device(s) to track.
+		 * @return Reference to the reactive float variable.
+		 */
 		virtual reaction::Var<float>& get_floating(floating what, device_t devices = all_devices) = 0;
 
+		/** @brief Integer input identifiers. */
 		enum integer {
 			current_frame,
 			current_device
 		};
 
+		/**
+		 * @brief Gets a reactive integer variable for a specific input.
+		 * @param what The input identifier.
+		 * @param devices The device(s) to track.
+		 * @return Reference to the reactive int64 variable.
+		 */
 		virtual reaction::Var<int64_t>& get_integer(integer what, device_t devices = all_devices) = 0;
 
+		/** @brief Vector input identifiers. */
 		enum vector {
 			mouse_position,
 			mouse_wheel,
 		};
 
+		/**
+		 * @brief Gets a reactive vector variable for a specific input.
+		 * @param what The input identifier.
+		 * @param devices The device(s) to track.
+		 * @return Reference to the reactive vector variable.
+		 */
 		virtual reaction::Var<stdmath::vector<float, 2>>& get_vector(vector what, device_t devices = all_devices) = 0;
 
-		// Tracks the change from the last event
+		/**
+		 * @brief Tracks the change from the last event.
+		 * @tparam Taction The type of reactive action.
+		 * @param action The reactive action.
+		 * @return A reactive expression for the delta.
+		 */
 		template<reaction::IsReact Taction>
 		static auto delta(Taction action) {
 			return reaction::calc([](auto current) {
@@ -312,7 +363,13 @@ namespace stylizer {
 			}, action);
 		}
 
-		// Tracks the change that occurs per frame (requires time to be updated using update_time)
+		/**
+		 * @brief Tracks the change that occurs per frame.
+		 * @tparam Taction The type of reactive action.
+		 * @tparam frames_to_keep Number of frames to keep in history.
+		 * @param action The reactive action.
+		 * @return A reactive expression for the per-frame delta.
+		 */
 		template<reaction::IsReact Taction, size_t frames_to_keep = 5>
 		auto per_frame_delta(Taction action) {
 			return reaction::calc([](auto current, size_t frame) {
@@ -332,24 +389,25 @@ namespace stylizer {
 			}, action, get_integer(current_frame));
 		}
 
-		// 0 to indicate no keys, 1 to indicate any keys
+		/** @brief Reactive OR of multiple actions. */
 		template<reaction::IsReact... Tactions>
 		static auto any_of(Tactions... actions) {
 			return reaction::expr((actions || ...));
 		}
 
+		/** @brief Reactive AND of multiple actions. */
 		template<reaction::IsReact... Tactions>
 		static auto all_of(Tactions... actions) {
 			return reaction::expr((actions && ...));
 		}
 
-		// The number of keys in the combo that are pressed
+		/** @brief Reactive sum of multiple actions (e.g. for combo counting). */
 		template<reaction::IsReact... Tactions>
 		static auto combination(Tactions... actions) {
 			return reaction::expr((actions + ...));
 		}
 
-		// Computes pos - neg, or in other words, converts inputs to [-1, 1]
+		/** @brief Converts two boolean buttons to a [-1, 1] axis. */
 		template<reaction::IsReact Tpositive, reaction::IsReact Tnegative>
 		static auto buttons_to_axis(Tpositive pos, Tnegative neg) {
 			return reaction::calc([](auto pos, auto neg) {
@@ -357,6 +415,7 @@ namespace stylizer {
 			}, pos, neg);
 		}
 
+		/** @brief Normalizes a scalar reactive value. */
 		template<reaction::IsReact Taction>
 		requires(!requires (Taction v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
 		static auto normalize(Taction action, float epsilon = .001) {
@@ -365,6 +424,7 @@ namespace stylizer {
 			}, action);
 		}
 
+		/** @brief Combines two scalar reactive values into a vector. */
 		template<reaction::IsReact Tx, reaction::IsReact Ty>
 		static auto floats_to_vector(Tx x, Ty y) {
 			return reaction::calc([](auto x, auto y) {
@@ -372,11 +432,13 @@ namespace stylizer {
 			}, x, y);
 		}
 
+		/** @brief Converts four button inputs to a 2D vector axis. */
 		template<reaction::IsReact Tup, reaction::IsReact Tdown, reaction::IsReact Tleft, reaction::IsReact Tright>
 		static auto buttons_to_vector(Tup up, Tdown down, Tleft left, Tright right) {
 			return floats_to_vector(buttons_to_axis(right, left), buttons_to_axis(up, down));
 		}
 
+		/** @brief Extracts the X axis from a reactive vector. */
 		template<reaction::IsReact Tvector>
 		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
 		static auto x_axis(Tvector v) {
@@ -385,6 +447,7 @@ namespace stylizer {
 			}, v);
 		}
 
+		/** @brief Extracts the Y axis from a reactive vector. */
 		template<reaction::IsReact Tvector>
 		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
 		static auto y_axis(Tvector v) {
@@ -393,6 +456,7 @@ namespace stylizer {
 			}, v);
 		}
 
+		/** @brief Applies a dead zone to a reactive vector. */
 		template<reaction::IsReact Tvector>
 		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
 		static auto dead_zone(Tvector v) {
@@ -403,6 +467,7 @@ namespace stylizer {
 			}, v);
 		}
 
+		/** @brief Normalizes a reactive vector. */
 		template<reaction::IsReact Tvector>
 		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
 		static auto normalize(Tvector v) {
@@ -411,6 +476,11 @@ namespace stylizer {
 			}, v);
 		}
 
+		/**
+		 * @brief Helper for common WASD (and optionally arrow keys) movement input.
+		 * @param also_use_arrow_keys Whether to also include arrow keys.
+		 * @return A reactive vector axis.
+		 */
 		auto wasd(bool also_use_arrow_keys = true) {
 			if(also_use_arrow_keys)
 				return buttons_to_vector(
@@ -422,6 +492,7 @@ namespace stylizer {
 			return buttons_to_vector(get_boolean(key_w), get_boolean(key_s), get_boolean(key_a), get_boolean(key_d));
 		}
 
+		/** @brief Reactive maximum of multiple actions. */
 		template<reaction::IsReact... Tactions>
 		static auto max(Tactions... actions) {
 			return reaction::calc([](auto... vs) {
@@ -429,6 +500,7 @@ namespace stylizer {
 			}, actions...);
 		}
 
+		/** @brief Reactive minimum of multiple actions. */
 		template<reaction::IsReact... Tactions>
 		static auto min(Tactions... actions) {
 			return reaction::calc([](auto... vs) {
@@ -436,12 +508,19 @@ namespace stylizer {
 			}, actions...);
 		}
 
+		/** @brief Reactive sum of multiple actions. */
 		template<reaction::IsReact... Tactions>
 		static auto sum(Tactions... actions) {
 			return reaction::expr((actions + ...));
 		}
+
+		/** @brief Virtual destructor. */
+		virtual ~input() = default;
 	};
 
+	/**
+	 * @brief Concept for a valid input handler type.
+	 */
 	template<typename T>
 	concept input_concept = std::derived_from<T, input> && requires(T t) {
 		{ t.type } -> std::convertible_to<size_t>;
