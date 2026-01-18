@@ -1,4 +1,4 @@
-add_library(stylizer_model dynamic_mesh.cpp model.cpp)
+add_library(stylizer_model dynamic_mesh.cpp mesh.cpp model.cpp)
 target_link_libraries(stylizer_model PUBLIC stylizer::image)
 target_compile_options(stylizer_model PUBLIC -DSTYLIZER_MODEL_AVAILABLE)
 

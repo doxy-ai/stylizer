@@ -21,6 +21,21 @@ namespace stylizer { inline namespace models {
 		return *this;
 	}
 
+	model& model::upload(context& ctx, const frame_buffer& fb) {
+		for(auto& [mesh, material]: *this) {
+			if(mesh.owned) 
+				mesh->rebuild_gpu_caches(ctx);
+
+			if(material.owned) {
+				auto flat_mat = dynamic_cast<flat_material*>(&*material);
+				if(!flat_mat) continue;
+				
+				flat_mat->create_from_configured(ctx, fb);
+			}
+		}
+		return *this;
+	}
+
 	api::current_backend::render::pass& model::draw_instanced(
 		context& ctx, api::current_backend::render::pass& render_pass,
 		instance_data::buffer_base& instance_data, std::optional<utility_buffer> util /* = {} */

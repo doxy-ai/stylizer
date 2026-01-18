@@ -63,27 +63,14 @@ namespace stylizer { inline namespace models {
 
 		virtual std::optional<size_t> lookup_attribute(std::string_view name) = 0;
 		virtual std::span<std::string_view> available_attributes() = 0;
-		virtual std::vector<size_t> build_attribute_list(std::span<std::string_view> requested_attributes) {
-			std::vector<size_t> out;
-			for(auto attribute: requested_attributes) {
-				auto index = lookup_attribute(attribute);
-				if(!index) return {};
-				out.push_back(*index);
-			}
-			return out;
-		}
+		virtual std::vector<size_t> build_attribute_list(std::span<std::string_view> requested_attributes);
 		virtual std::span<size_t> attribute_indicies() = 0;
 		virtual vertex_storage& attribute_storage(size_t index) = 0;
 		virtual std::span<std::byte> attribute_bytes(size_t index) {
 			return attribute_storage(index).byte_span();
 		}
 
-		virtual size_t attribute_offset(size_t index) {
-			size_t total = 0;
-			for(auto index : attribute_indicies())
-				total += attribute_bytes(index).size();
-			return total;
-		}
+		virtual size_t attribute_offset(size_t index);
 
 		virtual std::optional<std::span<uint32_t>> indicies_view() = 0;
 		struct meshlet {
@@ -92,42 +79,10 @@ namespace stylizer { inline namespace models {
 		virtual std::optional<std::span<meshlet>> meshlets_view() = 0;
 
 		api::current_backend::buffer index_buffer = {};
-        virtual api::current_backend::buffer* get_index_buffer(context& ctx, bool rebuild = false) {
-			if(!indicies_view())
-				return nullptr;
+        virtual api::current_backend::buffer* get_index_buffer(context& ctx, bool rebuild = false);
 
-			if(!index_buffer || rebuild) {
-				// index_buffer.release(); // TODO: Why do the buffers have some initial value?
-				index_buffer = ctx.create_and_write_buffer(api::usage::Index, byte_span<uint32_t>(*indicies_view()), 0, "Stylizer Mesh Index Buffer");
-			}
-			return &index_buffer;
-		}
-
-		struct vertex_buffer_cache_helper {
-			std::uint64_t operator()(const std::span<const size_t> indicies) const {
-				std::uint64_t hash = std::hash<size_t>{}(indicies.front());
-				for(size_t i = 1; i < indicies.size(); ++i)
-					hash ^= std::hash<size_t>{}(indicies[i]);
-				return hash;
-			}
-			bool operator()(const std::span<const size_t> a, const std::span<const size_t> b) const {
-				return operator()(a) == operator()(b);
-			}
-		};
 		std::unordered_map<size_t, std::vector<api::current_backend::buffer>> vertex_buffer_cache;
-		virtual std::span<api::current_backend::buffer> get_vertex_buffers(context& ctx, std::span<const size_t> attribute_indicies, bool rebuild = false) {
-			size_t hash = vertex_buffer_cache_helper{}(attribute_indicies);
-			if(vertex_buffer_cache.contains(hash))
-				return vertex_buffer_cache[hash];
-
-			std::vector<api::current_backend::buffer> buffers;
-			for(size_t index : attribute_indicies) {
-				auto data = attribute_bytes(index);
-				buffers.emplace_back(ctx.create_and_write_buffer(api::usage::Vertex, data, 0, "Stylizer Mesh Vertex Buffer"));
-			}
-
-			return vertex_buffer_cache[hash] = std::move(buffers);
-		}
+		virtual std::span<api::current_backend::buffer> get_vertex_buffers(context& ctx, std::span<const size_t> attribute_indicies, bool rebuild = false);
 
 		virtual void rebuild_gpu_caches(context& ctx) {
 			get_index_buffer(ctx, true);
@@ -139,30 +94,13 @@ namespace stylizer { inline namespace models {
 				return idx->size();
 			return 0;
 		}
-		virtual size_t vertex_count() {
-			uint32_t max = 0;
-			if(auto meshlets = meshlets_view(); meshlets) {
-				for(auto meshlet: *meshlets)
-					max = std::max(max, *std::max_element(meshlet.indicies.begin(), meshlet.indicies.end()));
-			} else if(indicies_view())
-				max = std::max(max, *std::max_element(indicies_view()->begin(), indicies_view()->end()));
-			else
-				max = attribute_storage(0).size();
-			return max;
-		}
+		virtual size_t vertex_count();
 
 		virtual vertex_storage& add_vertex_attribute(std::string_view name, vertex_storage&& storage) = 0;
 		virtual std::span<uint32_t> set_index_data(std::span<const uint32_t> indicies) = 0;
 		virtual mesh& clear_index_data() { return *this; }
 
-		virtual bool verify() {
-			auto indicies = attribute_indicies();
-			auto vertex_count = this->vertex_count();
-			for(auto idx: indicies)
-				if(attribute_storage(idx).as_bytes().size() != vertex_count)
-					return false;
-			return true;
-		}
+		virtual bool verify();
 	};
 
     struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> {
@@ -171,21 +109,7 @@ namespace stylizer { inline namespace models {
 		static maybe_owned<model> load(context& ctx, std::filesystem::path file);
 
 		model& override_materials(material& override_material);
-
-		model& upload(context& ctx, const frame_buffer& fb) {
-			for(auto& [mesh, material]: *this) {
-				if(mesh.owned) 
-					mesh->rebuild_gpu_caches(ctx);
-
-				if(material.owned) {
-					auto flat_mat = dynamic_cast<flat_material*>(&*material);
-					if(!flat_mat) continue;
-					
-					flat_mat->create_from_configured(ctx, fb);
-				}
-			}
-			return *this;
-		}
+		model& upload(context& ctx, const frame_buffer& fb);
 
 		api::current_backend::render::pass& draw_instanced(
 			context& ctx, api::current_backend::render::pass& render_pass,
