@@ -12,8 +12,8 @@ namespace stylizer {
 
 		virtual void update_time(const time& time) {
 			reaction::batchExecute([&] {
-				get_floating(current_time).value(time.total);
-				get_integer(current_frame).value(time.frame);
+				update_if_different(get_floating(current_time), time.total);
+				update_if_different(get_integer(current_frame), int64_t{time.frame});
 			});
 		}
 

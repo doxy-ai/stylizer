@@ -1,6 +1,7 @@
 #include "window.hpp"
 #include "event.hpp"
 #include "cstring_from_view.hpp"
+#include "stylizer/core/util/maybe_owned.hpp"
 #include "util/flags.hpp"
 
 #include <stylizer/api/sdl3.hpp>
@@ -170,7 +171,7 @@ namespace stylizer::sdl {
 
 		out.update_as_internal([&] {
 			SDL_GetWindowSize(out.sdl, &x, &y);
-			out.size.value(stdmath::vector<int32_t, 2>{x, y});
+			update_if_different<stdmath::vector<uint32_t, 2>>(out.size, stdmath::vector<int32_t, 2>{x, y});
 		});
 
 		return out;
@@ -194,9 +195,9 @@ namespace stylizer::sdl {
 			update_as_internal([&]{
 				switch (event.type) {
 				break; case SDL_EVENT_WINDOW_SHOWN:
-					visible.value(true);
+					update_if_different(visible, true);
 				break; case SDL_EVENT_WINDOW_HIDDEN:
-					visible.value(false);
+					update_if_different(visible, false);
 				// break; case SDL_EVENT_WINDOW_MOVED:
 				// 	// TODO: Why don't these update?
 				// 	position.value(stdmath::vector<int64_t, 2>{event.window.data1, event.window.data2});
@@ -204,24 +205,24 @@ namespace stylizer::sdl {
 				// 	// TODO: Why don't these update?
 				// 	size.value(stdmath::vector<int64_t, 2>{event.window.data1, event.window.data2});
 				break; case SDL_EVENT_WINDOW_MINIMIZED:
-					minimized.value(true); // NOTE: These won't update on wayland... do we care?
+					update_if_different(minimized, true); // NOTE: These won't update on wayland... do we care?
 				break; case SDL_EVENT_WINDOW_MAXIMIZED:
-					maximized.value(true);
+					update_if_different(maximized, true);
 				break; case SDL_EVENT_WINDOW_RESTORED:
 					reaction::batchExecute([&] {
-						minimized.value(false);
-						maximized.value(false);
+						update_if_different(minimized, false);
+						update_if_different(maximized, false);
 					});
 				break; case SDL_EVENT_WINDOW_FOCUS_GAINED:
-					focused.value(true);
+					update_if_different(focused, true);
 				break; case SDL_EVENT_WINDOW_FOCUS_LOST:
-					focused.value(false);
+					update_if_different(focused, false);
 				break; case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-					close_requested.value(true);
+					update_if_different(close_requested, true);
 				break; case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
-					fullscreen.value(true);
+					update_if_different(fullscreen, true);
 				break; case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
-					fullscreen.value(false);
+					update_if_different(fullscreen, false);
 				}
 			});
 		});
@@ -231,10 +232,10 @@ namespace stylizer::sdl {
 		update_as_internal([this]{ reaction::batchExecute([this]{
 			int x, y;
 			SDL_GetWindowPosition(sdl, &x, &y);
-			position.value(stdmath::vector<int32_t, 2>{x, y});
+			update_if_any_different(position, {x, y});
 
 			SDL_GetWindowSize(sdl, &x, &y);
-			size.value(stdmath::vector<int32_t, 2>{x, y});
+			update_if_any_different<stdmath::vector<uint32_t, 2>>(size, stdmath::vector<int32_t, 2>{x, y});
 		}); });
 	}
 

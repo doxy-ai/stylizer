@@ -2,17 +2,15 @@
 
 #include <stylizer/api/api.hpp>
 #include <stylizer/api/backends/current_backend.hpp>
-#include <reaction/reaction.h>
 
 #include <math/matrix.hpp>
 
-#include "backends/webgpu/webgpu.hpp"
 #include "util/maybe_owned.hpp"
+#include "util/reactive.hpp"
 
 #include <chrono>
 #include <cstddef>
 #include <ratio>
-#include <unordered_map>
 
 namespace stylizer {
 	using namespace api::operators;
@@ -213,6 +211,16 @@ namespace stylizer {
 
 		virtual api::current_backend::render::pass create_render_pass(context& ctx, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = {}, bool one_shot = true) {
 			return ctx.create_render_pass(color_attachments(color_template), depth_stencil_attachment(depth_template), one_shot);
+		}
+
+		virtual frame_buffer& update_size_debounced(const stdmath::vector<uint32_t, 3>& size, float dt, float time_to_wait = .1);
+		frame_buffer& update_size_debounced(const stdmath::vector<uint32_t, 3>& size, struct time& time, float time_to_wait = .1);
+
+		frame_buffer& update_size_from_surface(surface& surface, struct time& time, float time_to_wait = .1) {
+			return update_size_debounced(surface.texture_size()(), time, time_to_wait);
+		}
+		frame_buffer& update_size_from_texture(texture& texture, struct time& time, float time_to_wait = .1) {
+			return update_size_debounced(texture.size(), time, time_to_wait);
 		}
 
 		virtual reaction::Action<> link_size_to_surface(surface& surface) {

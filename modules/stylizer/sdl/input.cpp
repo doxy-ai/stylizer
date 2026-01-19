@@ -27,55 +27,55 @@ namespace stylizer::sdl {
 			switch(event.type) {
 			break; case SDL_EVENT_KEY_DOWN: [[fallthrough]];
 			case SDL_EVENT_KEY_UP: {
-				get_integer(current_device).value(event.key.which);
+				update_if_different(get_integer(current_device), int64_t(event.key.which));
 
 				auto lookup = convert_keycode(event.key.key);
 				if(booleans.contains(lookup)) {
 					auto& map = booleans[lookup];
 					if(map.contains(input::all_devices)) {
-						map[all_devices].value(event.key.down);
+						update_if_different(map[all_devices], event.key.down);
 						processed = true;
 					}
 
 					device_t specific = event.key.which;
 					if(map.contains(specific)) {
-						map[specific].value(event.key.down);
+						update_if_different(map[specific], event.key.down);
 						processed = true;
 					}
 				}
 			}
 
 			break; case SDL_EVENT_MOUSE_WHEEL: {
-				get_integer(current_device).value(event.wheel.which);
+				update_if_different(get_integer(current_device), int64_t(event.wheel.which));
 
 				if(vectors.contains(mouse_wheel)) {
 					auto& map = vectors[mouse_wheel];
 					if(map.contains(input::all_devices)) {
-						map[all_devices].value(stdmath::vector<float, 2>{event.wheel.x, event.wheel.y});
+						update_if_any_different(map[all_devices], stdmath::vector<float, 2>{event.wheel.x, event.wheel.y});
 						processed = true;
 					}
 
 					device_t specific = event.wheel.which;
 					if(map.contains(specific)) {
-						map[specific].value(stdmath::vector<float, 2>{event.wheel.x, event.wheel.y});
+						update_if_any_different(map[specific], stdmath::vector<float, 2>{event.wheel.x, event.wheel.y});
 						processed = true;
 					}
 				}
 			}
 
 			break; case SDL_EVENT_MOUSE_MOTION: {
-				get_integer(current_device).value(event.motion.which);
+				update_if_different(get_integer(current_device), int64_t(event.motion.which));
 
 				if(vectors.contains(mouse_position)) {
 					auto& map = vectors[mouse_position];
 					if(map.contains(input::all_devices)) {
-						map[all_devices].value(stdmath::vector<float, 2>{event.motion.x, event.motion.y});
+						update_if_any_different(map[all_devices], stdmath::vector<float, 2>{event.motion.x, event.motion.y});
 						processed = true;
 					}
 
 					device_t specific = event.motion.which;
 					if(map.contains(specific)) {
-						map[specific].value(stdmath::vector<float, 2>{event.motion.x, event.motion.y});
+						update_if_any_different(map[specific], stdmath::vector<float, 2>{event.motion.x, event.motion.y});
 						processed = true;
 					}
 				}
