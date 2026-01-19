@@ -8,24 +8,24 @@ namespace stylizer {
 	struct color_depth_frame_buffer : public frame_buffer {
 		texture color, depth;
 
-		static color_depth_frame_buffer create(context& ctx, const stdmath::vector<size_t, 3>& size, const std::optional<stdmath::vector<float, 4>>& clear_value, api::texture::format color_format, api::texture::format depth_format = api::texture::format::Depth_u24, api::texture::create_config config_override = {}) {
+		static color_depth_frame_buffer create(
+			context& ctx, const stdmath::vector<uint32_t, 3>& size, const std::optional<stdmath::vector<float, 4>>& clear_value, 
+			texture::format color_format, texture::format depth_format = texture::format::Depth_u24, 
+			const texture::create_config& config_override = {}, const texture::sampler_config& sampler = {}) 
+		{
 			auto config = config_override;
 			config.usage |= api::usage::RenderAttachment;
 			config.format = color_format;
 			config.size = size;
-			api::texture::sampler_config sample;
 
 			color_depth_frame_buffer out;
 			out.size = reaction::var(size);
 			out.clear_value = clear_value;
-			out.color = texture::create(ctx, config);
-			out.color.configure_sampler(ctx, sample);
+			out.color = texture::create(ctx, config, sampler);
 			out.color.size = out.size; // TODO: does this link their reactive state like I hope it does?
 
 			config.format = depth_format;
-			out.depth = texture::create(ctx, config);
-			out.depth.configure_sampler(ctx, sample);
-			// sample.depth_comparison_function = api::comparison_function::
+			out.depth = texture::create(ctx, config, sampler);
 			out.depth.size = out.size;
 
 			return out;

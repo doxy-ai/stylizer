@@ -18,17 +18,20 @@ namespace stylizer {
 	using namespace api::operators;
 
 	struct context : public api::current_backend::device {
+		using super = api::current_backend::device;
+
+		context() {}
+		context(const context&) = delete; // Contexts can't be copied!
+		context(context&&) = default; // Contexts shouldn't be moved after reactive objects are created from them...
+		context& operator=(const context&) = delete;
+		context& operator=(context&&) = delete;
+
 		struct event {
 			virtual ~event() {}
 		};
 
 		signal<void(context&)> process_events;
 		signal<void(const event&)> handle_event;
-
-		context& update() {
-			process_events(*this);
-			return *this;
-		}
 
 		static context create_default(const api::device::create_config& config = {}) {
 			context out;
@@ -53,6 +56,11 @@ namespace stylizer {
 			return create_default(config);
 		}
 
+		context& update() {
+			process_events(*this);
+			return *this;
+		}
+
 		// TODO: Is there a better name than send?
 		void send(error_severity severity, std::string_view message, size_t error_tag = 0) {
 			get_error_handler()(severity, message, error_tag);
@@ -70,51 +78,76 @@ namespace stylizer {
 			send(error_severity::Verbose, message, error_tag);
 		}
 
+	protected:
+		// Hide some of super's methods
+		using super::tick;
 	};
 
 
 
 	struct texture : public api::current_backend::texture {
+		using super = api::current_backend::texture;
+
+		reaction::Var<stdmath::vector<uint32_t, 3>> size;
+
 		texture() = default;
-		texture(const texture&) = delete; // TODO: Textures should probably be copyable...
-		texture(texture&&) = default;
-		texture& operator=(const texture&) = delete;
-		texture& operator=(texture&&) = default;
+		texture(const texture& o) { *this = o; }
+		texture(texture&& o) { *this = std::move(o); }
+		texture& operator=(const texture&);
+		texture& operator=(texture&&);
 
-		create_config values;
-
-		reaction::Var<stdmath::vector<size_t, 3>> size;
-
-		static texture create(api::device& device, const create_config& config = {});
-		static texture create_and_write(api::device& device, std::span<const std::byte> data, const data_layout& layout, create_config config = {});
+		static texture create(context& ctx, const create_config& config = {}, const std::optional<sampler_config>& sampler = {});
+		static texture create_and_write(context& ctx, std::span<const std::byte> data, const data_layout& layout, const create_config& config = {}, const std::optional<sampler_config>& sampler = {});
 
 		static texture& get_default_texture(context& ctx);
 
-		texture& configure_sampler(api::device &device, const sampler_config &config = {}) {
-			api::current_backend::texture::configure_sampler(device, config);
+		texture& configure_sampler(context& ctx, const sampler_config& config = {}) {
+			sample_config = config;
+			api::current_backend::texture::configure_sampler(ctx, config);
 			return *this;
 		}
 
 	protected:
-		reaction::Action<> resize;
+		bool internal_update = false;
+		create_config config;
+		std::optional<sampler_config> sample_config;
+		context* creation_context;
+
+		template<typename Tfunc>
+		auto update_as_internal(const Tfunc& func) {
+			internal_update = true;
+			if constexpr (std::is_same_v<decltype(func()), void>) {
+				func();
+				internal_update = false;
+			} else {
+				auto out = func();
+				internal_update = false;
+				return out;
+			}
+		}
+
+		reaction::Action<> resize; void resize_impl(const stdmath::vector<uint32_t, 3>& size);
+
+		// Hide some of super's methods
+		using super::create;
+		using super::create_and_write;
+		using super::configure_sampler;
 	};
 
-	struct surface : protected api::current_backend::surface {
+	struct surface : public api::current_backend::surface {
+		using super = api::current_backend::surface;
+
 		surface() = default;
 		surface(const surface&) = delete;
-		surface(surface&&) = default;
+		surface(surface&& o) { o = std::move(*this); }
 		surface& operator=(const surface&) = delete;
-		surface& operator=(surface&&) = default;
+		surface& operator=(surface&&);
 
-		reaction::Var<stdmath::vector<size_t, 2>> size;
+		reaction::Var<stdmath::vector<uint32_t, 2>> size;
 		reaction::Var<enum present_mode> present_mode; //= surface::present_mode::Fifo;
 		reaction::Var<api::texture_format> texture_format; //= api::texture_format::RGBAu8_NormalizedSRGB;
 		reaction::Var<api::alpha_mode> alpha_mode; //= api::alpha_mode::Opaque;
 		reaction::Var<api::usage> usage; // = api::usage::RenderAttachment;
-		reaction::Var<struct context*> associated_context;
-
-		using api::current_backend::surface::operator bool;
-		using api::current_backend::surface::next_texture;
 
 		surface& present(api::device& device) override {
 			api::current_backend::surface::present(device);
@@ -127,21 +160,37 @@ namespace stylizer {
 			return present(ctx);
 		}
 
+		reaction::Calc<stdmath::vector<uint32_t, 3>> texture_size() { return reaction::calc([](const stdmath::vector<uint32_t, 2>& size){
+			return stdmath::vector<uint32_t, 3>{size, 1};
+		}, size); }
+
 		using api::current_backend::surface::release;
 		using api::current_backend::surface::auto_release;
 
 		friend struct window;
-protected:
-		static surface create(context& ctx, api::current_backend::surface& surface, const stdmath::vector<size_t, 2>& size);
+	protected:
+		static surface create(context& ctx, api::current_backend::surface& surface, const stdmath::vector<uint32_t, 2>& size);
 
-		reaction::Action<> resize;
+		context* creation_context;
+
+		reaction::Action<> reconfigure; void reconfigure_impl(stdmath::vector<size_t, 2> size, enum present_mode present_mode,
+			api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage);
+
+		// Hide some of super's methods
+		using super::create_from_emscripten;
+		using super::create_from_cocoa;
+		using super::create_from_x11;
+		using super::create_from_wayland;
+		using super::create_from_win32;
+		using super::determine_optimal_default_config;
+		using super::configured_texture_format;
 	};
 
 
 
 
 	struct frame_buffer {
-		reaction::Var<stdmath::vector<size_t, 3>> size;
+		reaction::Var<stdmath::vector<uint32_t, 3>> size;
 		std::optional<stdmath::vector<float, 4>> clear_value = {};
 
 		virtual texture& color_texture() = 0;

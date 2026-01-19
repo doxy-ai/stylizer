@@ -5,6 +5,7 @@
 #include <stylizer/api/sdl3.hpp>
 
 namespace stylizer::sdl {
+
 	void window::register_event_listener(context& ctx) {
 		if(!get_global_sdl_event_handler())
 			get_global_sdl_event_handler() = setup_sdl_events(ctx);
@@ -111,7 +112,7 @@ namespace stylizer::sdl {
 		}, out.position);
 
 		auto surface = api::sdl3::create_surface<api::current_backend::surface>(out.sdl);
-		static_cast<stylizer::surface&>(out) = std::move(stylizer::surface::create(ctx, surface, size));
+		static_cast<stylizer::surface&>(out) = stylizer::surface::create(ctx, surface, size);
 		return out;
 	}
 

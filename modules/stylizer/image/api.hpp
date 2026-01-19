@@ -2,6 +2,7 @@
 
 #include "api.hpp"
 
+#include <optional>
 #include <stylizer/core/api.hpp>
 #include <stylizer/core/util/load_file.hpp>
 #include <stylizer/core/util/maybe_owned.hpp>
@@ -27,7 +28,7 @@ namespace stylizer { inline namespace images {
 			return {bytes.data_handle(), bytes.extent(0)};
 		}
 
-		virtual texture& upload(context& ctx, texture& texture, texture::create_config config_template = {}) {
+		virtual texture& upload(context& ctx, texture& texture, texture::create_config config_template = {}, const std::optional<texture::sampler_config>& sampler_config = {}) {
 			auto byte_grid = get_byte_grid();
 			stdmath::vector<size_t, 3> extents = {extent(0), extent(1), extent(2)};
 			auto bytes_per_row = extents.x * extents.z * extent(3);
@@ -39,7 +40,7 @@ namespace stylizer { inline namespace images {
 				config_template.format = get_format();
 				config_template.size = extents;
 				config_template.usage |= api::usage::CopyDestination;
-				texture = texture::create(ctx, config_template);
+				texture = texture::create(ctx, config_template, sampler_config);
 			}
 			texture.write(ctx, {byte_grid.data_handle(), size}, {
 				.offset = 0,
@@ -48,9 +49,9 @@ namespace stylizer { inline namespace images {
 			}, extents);
 			return texture;
 		};
-		texture upload(context& ctx, texture::create_config config_template = {}) {
+		texture upload(context& ctx, texture::create_config config_template = {}, const std::optional<texture::sampler_config>& sampler_config = {}) {
 			texture out;
-			return std::move(upload(ctx, out, config_template));
+			return std::move(upload(ctx, out, config_template, sampler_config));
 		}
 	};
 
