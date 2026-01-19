@@ -4,12 +4,15 @@ namespace stylizer {
 
 	surface& surface::operator=(surface&& o) {
 		*(super*)this = std::move((super&)o);
-		size = std::move(o.size);
-		present_mode = std::move(o.present_mode);
-		texture_format = std::move(o.texture_format);
-		alpha_mode = std::move(o.alpha_mode);
-		usage = std::move(o.usage);
-		creation_context = std::move(o.creation_context);
+		
+		update_as_internal([&]{
+			size = std::move(o.size);
+			present_mode = std::move(o.present_mode);
+			texture_format = std::move(o.texture_format);
+			alpha_mode = std::move(o.alpha_mode);
+			usage = std::move(o.usage);
+			creation_context = std::move(o.creation_context);
+		});
 
 		o.reconfigure.close();
 		reconfigure = reaction::action([this](
@@ -47,6 +50,8 @@ namespace stylizer {
 		stdmath::vector<size_t, 2> size, enum present_mode present_mode,
 		api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage
 	) {
+		if(internal_update) return;
+
 		surface::config config;
 		config.size = size;
 		config.present_mode = present_mode;

@@ -172,6 +172,20 @@ namespace stylizer {
 		static surface create(context& ctx, api::current_backend::surface& surface, const stdmath::vector<uint32_t, 2>& size);
 
 		context* creation_context;
+		bool internal_update = false;
+
+		template<typename Tfunc>
+		auto update_as_internal(const Tfunc& func) {
+			internal_update = true;
+			if constexpr (std::is_same_v<decltype(func()), void>) {
+				func();
+				internal_update = false;
+			} else {
+				auto out = func();
+				internal_update = false;
+				return out;
+			}
+		}
 
 		reaction::Action<> reconfigure; void reconfigure_impl(stdmath::vector<size_t, 2> size, enum present_mode present_mode,
 			api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage);
@@ -199,6 +213,12 @@ namespace stylizer {
 
 		virtual api::current_backend::render::pass create_render_pass(context& ctx, api::color_attachment color_template = {}, api::depth_stencil_attachment depth_template = {}, bool one_shot = true) {
 			return ctx.create_render_pass(color_attachments(color_template), depth_stencil_attachment(depth_template), one_shot);
+		}
+
+		virtual reaction::Action<> link_size_to_surface(surface& surface) {
+			return reaction::action([this](const stdmath::vector<uint32_t, 3>& size) {
+				this->size.value(size);
+			}, surface.texture_size());
 		}
 
 		constexpr static api::depth_stencil_attachment default_draw_to_depth_config {
