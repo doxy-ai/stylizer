@@ -37,7 +37,6 @@ namespace stylizer { inline namespace images {
 	}
 
 	stylizer::maybe_owned<stylizer::image> load_stb_image_generic(context& ctx, std::span<std::byte> memory, std::string_view extension /* = {} */) {
-		auto out = load_stb_image(ctx, memory, extension);
-		return stylizer::maybe_owned<stylizer::dynamic_memory_image<stdmath::vector<uint8_t, 4>>>::make_owned_and_move(out).move_as<stylizer::image>();
+		return load_stb_image(ctx, memory, extension).move_to_owned();
 	}
 }}

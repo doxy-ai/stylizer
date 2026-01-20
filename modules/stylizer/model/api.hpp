@@ -11,7 +11,7 @@
 
 namespace stylizer { inline namespace models {
 
-    struct mesh {
+    struct mesh { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(mesh)
 		enum class Type {
 			Triangle,
 			Line,
@@ -103,7 +103,7 @@ namespace stylizer { inline namespace models {
 		virtual bool verify();
 	};
 
-    struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> {
+    struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(model)
 
 		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set();
 		static maybe_owned<model> load(context& ctx, std::filesystem::path file);

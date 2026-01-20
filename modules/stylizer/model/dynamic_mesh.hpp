@@ -3,9 +3,9 @@
 #include "api.hpp"
 #include <optional>
 
-namespace stylizer { inline namespace models {
+namespace stylizer { inline namespace models { 
 
-	struct dynamic_mesh : public mesh {
+	struct dynamic_mesh : public mesh { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(dynamic_mesh, mesh)
 		std::unordered_map<std::string, size_t> names2index;
 		std::vector<vertex_storage> attribute_data;
 		std::vector<uint32_t> index_data = {};

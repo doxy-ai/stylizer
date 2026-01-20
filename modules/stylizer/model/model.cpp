@@ -76,7 +76,6 @@ namespace stylizer { inline namespace models {
 	}
 
 	maybe_owned<model> load_tinyobj_model_generic(stylizer::context& ctx, std::span<std::byte> memory, std::string_view extension /* = {} */) {
-		auto out = load_tinyobj_model(ctx, memory);
-		return maybe_owned<model>::make_owned_and_move(out);
+		return load_tinyobj_model(ctx, memory).move_to_owned();
 	}
 }}

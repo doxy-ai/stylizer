@@ -8,7 +8,7 @@
 #include <stylizer/core/util/maybe_owned.hpp>
 
 namespace stylizer { inline namespace images {
-	struct image {
+	struct image { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(image)
 		// For a 2D image the Z dimension is 1
 		// The W dimension is bytes of color data
 		using byte_grid = stdmath::stl::mdspan<std::byte, stdmath::stl::extents<size_t, stdmath::stl::dynamic_extent, stdmath::stl::dynamic_extent, stdmath::stl::dynamic_extent, stdmath::stl::dynamic_extent>>;

@@ -5,7 +5,7 @@
 
 namespace stylizer {
 
-	struct color_depth_frame_buffer : public frame_buffer {
+	struct color_depth_frame_buffer : public frame_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(color_depth_frame_buffer, frame_buffer)
 		texture color, depth;
 
 		static color_depth_frame_buffer create(

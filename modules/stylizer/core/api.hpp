@@ -15,6 +15,22 @@
 namespace stylizer {
 	using namespace api::operators;
 
+	#define STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(type)\
+		type&& move() { return std::move(*this); }\
+		virtual stylizer::maybe_owned<type> move_to_owned() = 0;
+	#define STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(type)\
+		type&& move() { return std::move(*this); }\
+		virtual stylizer::maybe_owned<type> move_to_owned() {\
+			return stylizer::maybe_owned<type>::make_owned_and_move(*this);\
+		}
+	#define STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(type, lowest_base)\
+		type&& move() { return std::move(*this); }\
+		stylizer::maybe_owned<lowest_base> move_to_owned() override {\
+			return stylizer::maybe_owned<type>::make_owned_and_move(*this).template move_as<lowest_base>();\
+		}
+
+
+
 	struct context : public api::current_backend::device {
 		using super = api::current_backend::device;
 
@@ -83,7 +99,7 @@ namespace stylizer {
 
 
 
-	struct texture : public api::current_backend::texture {
+	struct texture : public api::current_backend::texture { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(texture)
 		using super = api::current_backend::texture;
 
 		reaction::Var<stdmath::vector<uint32_t, 3>> size;
@@ -132,7 +148,7 @@ namespace stylizer {
 		using super::configure_sampler;
 	};
 
-	struct surface : public api::current_backend::surface {
+	struct surface : public api::current_backend::surface { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(surface)
 		using super = api::current_backend::surface;
 
 		surface() = default;
@@ -201,7 +217,7 @@ namespace stylizer {
 
 
 
-	struct frame_buffer {
+	struct frame_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(frame_buffer)
 		reaction::Var<stdmath::vector<uint32_t, 3>> size;
 		std::optional<stdmath::vector<float, 4>> clear_value = {};
 
@@ -252,7 +268,7 @@ namespace stylizer {
 
 
 
-	struct material : public api::current_backend::render::pipeline {
+	struct material : public api::current_backend::render::pipeline { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(material)
 		material() = default; // TODO: Default materials okay?
 		material(api::current_backend::render::pipeline&& pipeline)
 			: api::current_backend::render::pipeline(std::move(pipeline)) {}
@@ -291,7 +307,7 @@ namespace stylizer {
 
 
 
-	struct managed_buffer : public api::current_backend::buffer {
+	struct managed_buffer : public api::current_backend::buffer { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(managed_buffer)
 		virtual std::span<const std::byte> to_bytes() = 0;
 		virtual managed_buffer& upload(context& ctx, std::string_view label = "Stylizer Managed Buffer") {
 			auto bytes = to_bytes();
@@ -341,7 +357,7 @@ namespace stylizer {
 		}
 	};
 
-	struct camera {
+	struct camera { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(camera)
 		virtual stdmath::matrix<float, 4, 4> view_matrix() const = 0;
 		virtual stdmath::matrix<float, 4, 4> projection_matrix(const stdmath::vector<size_t, 2>& screen_size) const = 0;
 
@@ -353,7 +369,7 @@ namespace stylizer {
 		}
 	};
 
-	struct concrete_camera : public camera {
+	struct concrete_camera : public camera { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(concrete_camera, camera)
 		stdmath::matrix<float, 4, 4> view, projection;
 		stdmath::matrix<float, 4, 4> inverse_view, inverse_projection;
 
@@ -372,7 +388,7 @@ namespace stylizer {
 		stdmath::matrix<float, 4, 4> inverse_projection_matrix(const stdmath::vector<size_t, 2>& screen_size = {}) const override { return inverse_projection; }
 	};
 
-	struct utility_buffer : public managed_buffer {
+	struct utility_buffer : public managed_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(utility_buffer, managed_buffer)
 		concrete_camera camera;
 		struct time time;
 
@@ -404,7 +420,7 @@ namespace stylizer {
 		};
 
 		template<size_t N = std::dynamic_extent>
-		struct buffer : public buffer_base, public std::array<instance_data, N> {
+		struct buffer : public buffer_base, public std::array<instance_data, N> { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(buffer, managed_buffer)
 			using base = instance_data::buffer_base;
 
 			size_t count() const override { return N; }
@@ -416,7 +432,7 @@ namespace stylizer {
 	};
 
 	template<>
-	struct instance_data::buffer<std::dynamic_extent> : public instance_data::buffer_base, public std::vector<instance_data> {
+	struct instance_data::buffer<std::dynamic_extent> : public instance_data::buffer_base, public std::vector<instance_data> { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(buffer, managed_buffer)
 		using base = instance_data::buffer_base;
 
 		size_t count() const override { return std::vector<instance_data>::size(); }

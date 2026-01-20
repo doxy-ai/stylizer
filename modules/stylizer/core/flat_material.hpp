@@ -6,7 +6,7 @@
 
 namespace stylizer {
 
-	struct flat_material : public material {
+	struct flat_material : public material { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(flat_material, material)
 		using color_t = std::variant<stdmath::vector<float, 4>, maybe_owned<texture>>;
 		color_t color;
 		struct config {

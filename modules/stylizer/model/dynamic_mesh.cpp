@@ -158,25 +158,22 @@ namespace stylizer { inline namespace models {
 			}
 
 			for(auto& [mat, attrs]: material_meshes) {
-				auto owned_mesh = stylizer::maybe_owned<stylizer::dynamic_mesh>::make_owned(attrs.make_mesh());
-
 				if(!material_map.contains(mat)) {
-					stylizer::maybe_owned<stylizer::flat_material> material = new stylizer::flat_material(); material.owned = true;
-					if(mat >= 0) material->color = stdmath::vector<float, 4>(materials[mat].diffuse[0], materials[mat].diffuse[1], materials[mat].diffuse[2], 1);
-					else material->color = stdmath::vector<float, 4>(.5, .5, .5, 1);
+					stylizer::flat_material material;
+					if(mat >= 0) material.color = stdmath::vector<float, 4>(materials[mat].diffuse[0], materials[mat].diffuse[1], materials[mat].diffuse[2], 1);
+					else material.color = stdmath::vector<float, 4>(.5, .5, .5, 1);
 
 					if(mat >= 0 && !materials[mat].diffuse_texname.empty()) {
 						std::filesystem::path path = materials[mat].diffuse_texname;
-						auto image = stylizer::image::load(ctx, path);
-						material->color = stylizer::maybe_owned<stylizer::texture>::make_owned(std::move(image->upload(ctx).configure_sampler(ctx)));
+						material.color = stylizer::image::load(ctx, path)->upload(ctx).configure_sampler(ctx).move_to_owned();
 					}
 
-					auto& real = out.emplace_back(owned_mesh.move_as<stylizer::mesh>(), material.move_as<stylizer::material>());
+					auto& real = out.emplace_back(attrs.make_mesh().move_to_owned(), material.move_to_owned());
 					material_map[mat] = (stylizer::flat_material*)&*real.second;
 					continue;
 				}
 
-				out.emplace_back(owned_mesh.move_as<stylizer::mesh>(), material_map[mat]);
+				out.emplace_back(attrs.make_mesh().move_to_owned(), material_map[mat]);
 			}
 		}
 

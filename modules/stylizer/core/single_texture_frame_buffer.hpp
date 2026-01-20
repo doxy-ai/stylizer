@@ -6,7 +6,7 @@
 
 namespace stylizer {
 
-	struct single_texture_frame_buffer : public frame_buffer {
+	struct single_texture_frame_buffer : public frame_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(single_texture_frame_buffer, frame_buffer)
 		maybe_owned<texture> texture;
 
 		static single_texture_frame_buffer create(
