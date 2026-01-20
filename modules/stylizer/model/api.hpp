@@ -21,13 +21,13 @@ namespace stylizer { inline namespace models {
 		using vertex_storage_variant = std::variant<
 			storage<std::byte>,
 			storage<float>,
-			storage<stdmath::vector<float, 2>>,
-			// storage<stdmath::vector<float, 3>>, // NOTE: Vec3s are stored as vec4s with w = 0
-			storage<stdmath::vector<float, 4>>,
+			storage<stdmath::float2>,
+			// storage<stdmath::float3>, // NOTE: Vec3s are stored as vec4s with w = 0
+			storage<stdmath::float4>,
 			storage<int32_t>,
-			storage<stdmath::vector<int32_t, 2>>,
-			// storage<stdmath::vector<int32_t, 3>>, // NOTE: Vec3s are stored as vec4s with w = 0
-			storage<stdmath::vector<int32_t, 4>>
+			storage<stdmath::int2>,
+			// storage<stdmath::int3>, // NOTE: Vec3s are stored as vec4s with w = 0
+			storage<stdmath::int4>
 		>;
 		struct vertex_storage: public vertex_storage_variant {
 			using super = vertex_storage_variant;
@@ -52,13 +52,13 @@ namespace stylizer { inline namespace models {
 			}
 
 			storage<float>& get_float() { return std::get<storage<float>>(*this); }
-			storage<stdmath::vector<float, 2>>& get_float2() { return std::get<storage<stdmath::vector<float, 2>>>(*this); }
-			// storage<stdmath::vector<float, 3>>& get_vector3() { return std::get<storage<stdmath::vector<float, 3>>>(*this); }
-			storage<stdmath::vector<float, 4>>& get_float4() { return std::get<storage<stdmath::vector<float, 4>>>(*this); }
+			storage<stdmath::float2>& get_float2() { return std::get<storage<stdmath::float2>>(*this); }
+			// storage<stdmath::float3>& get_vector3() { return std::get<storage<stdmath::float3>>(*this); }
+			storage<stdmath::float4>& get_float4() { return std::get<storage<stdmath::float4>>(*this); }
 			storage<int32_t>& get_int() { return std::get<storage<int32_t>>(*this); }
-			storage<stdmath::vector<int32_t, 2>>& get_int2() { return std::get<storage<stdmath::vector<int32_t, 2>>>(*this); }
-			// storage<stdmath::vector<int32_t, 3>>& get_int_vector3() { return std::get<storage<stdmath::vector<int32_t, 3>>>(*this); }
-			storage<stdmath::vector<int32_t, 4>>& get_int4() { return std::get<storage<stdmath::vector<int32_t, 4>>>(*this); }
+			storage<stdmath::int2>& get_int2() { return std::get<storage<stdmath::int2>>(*this); }
+			// storage<stdmath::int3>& get_int_vector3() { return std::get<storage<stdmath::int3>>(*this); }
+			storage<stdmath::int4>& get_int4() { return std::get<storage<stdmath::int4>>(*this); }
 		};
 
 		virtual std::optional<size_t> lookup_attribute(std::string_view name) = 0;

@@ -16,7 +16,7 @@ namespace stylizer {
 
 		o.reconfigure.close();
 		reconfigure = reaction::action([this](
-			stdmath::vector<size_t, 2> size, enum present_mode present_mode,
+			stdmath::uint2 size, enum present_mode present_mode,
 			api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage
 		) {
 			reconfigure_impl(size, present_mode, texture_format, alphas_mode, usage);
@@ -24,12 +24,12 @@ namespace stylizer {
 		return *this;
 	}
 
-	surface surface::create(context& ctx, api::current_backend::surface& backing_surface, const stdmath::vector<uint32_t, 2>& size) {
+	surface surface::create(context& ctx, api::current_backend::surface& backing_surface, const stdmath::uint2& size) {
 		auto config = backing_surface.determine_optimal_default_config(ctx, size);
 
 		surface out;
 		static_cast<api::current_backend::surface&>(out) = backing_surface;
-		out.size = reaction::var(stdmath::vector<uint32_t, 2>{config.size});
+		out.size = reaction::var(stdmath::uint2{config.size});
 		out.present_mode = reaction::var(config.present_mode);
 		out.texture_format = reaction::var(config.texture_format);
 		out.alpha_mode = reaction::var(config.alpha_mode);
@@ -37,7 +37,7 @@ namespace stylizer {
 		out.creation_context = &ctx;
 
 		out.reconfigure = reaction::action([self = &out](
-			stdmath::vector<size_t, 2> size, enum present_mode present_mode,
+			stdmath::uint2 size, enum present_mode present_mode,
 			api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage
 		) {
 			self->reconfigure_impl(size, present_mode, texture_format, alphas_mode, usage);
@@ -47,7 +47,7 @@ namespace stylizer {
 	}
 
 	void surface::reconfigure_impl(
-		stdmath::vector<size_t, 2> size, enum present_mode present_mode,
+		stdmath::uint2 size, enum present_mode present_mode,
 		api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage
 	) {
 		if(internal_update) return;

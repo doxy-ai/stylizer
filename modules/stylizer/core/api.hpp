@@ -3,7 +3,7 @@
 #include <stylizer/api/api.hpp>
 #include <stylizer/api/backends/current_backend.hpp>
 
-#include <math/matrix.hpp>
+#include <math/slang_names.hpp>
 
 #include "util/maybe_owned.hpp"
 #include "util/reactive.hpp"
@@ -102,7 +102,7 @@ namespace stylizer {
 	struct texture : public api::current_backend::texture { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(texture)
 		using super = api::current_backend::texture;
 
-		reaction::Var<stdmath::vector<uint32_t, 3>> size;
+		reaction::Var<stdmath::uint3> size;
 
 		texture() = default;
 		texture(const texture& o) { *this = o; }
@@ -140,7 +140,7 @@ namespace stylizer {
 			}
 		}
 
-		reaction::Action<> resize; void resize_impl(const stdmath::vector<uint32_t, 3>& size);
+		reaction::Action<> resize; void resize_impl(const stdmath::uint3& size);
 
 		// Hide some of super's methods
 		using super::create;
@@ -157,7 +157,7 @@ namespace stylizer {
 		surface& operator=(const surface&) = delete;
 		surface& operator=(surface&&);
 
-		reaction::Var<stdmath::vector<uint32_t, 2>> size;
+		reaction::Var<stdmath::uint2> size;
 		reaction::Var<enum present_mode> present_mode; //= surface::present_mode::Fifo;
 		reaction::Var<api::texture_format> texture_format; //= api::texture_format::RGBAu8_NormalizedSRGB;
 		reaction::Var<api::alpha_mode> alpha_mode; //= api::alpha_mode::Opaque;
@@ -174,8 +174,8 @@ namespace stylizer {
 			return present(ctx);
 		}
 
-		reaction::Calc<stdmath::vector<uint32_t, 3>> texture_size() { return reaction::calc([](const stdmath::vector<uint32_t, 2>& size){
-			return stdmath::vector<uint32_t, 3>{size, 1};
+		reaction::Calc<stdmath::uint3> texture_size() { return reaction::calc([](const stdmath::uint2& size){
+			return stdmath::uint3{size, 1};
 		}, size); }
 
 		using api::current_backend::surface::release;
@@ -183,7 +183,7 @@ namespace stylizer {
 
 		friend struct window;
 	protected:
-		static surface create(context& ctx, api::current_backend::surface& surface, const stdmath::vector<uint32_t, 2>& size);
+		static surface create(context& ctx, api::current_backend::surface& surface, const stdmath::uint2& size);
 
 		context* creation_context;
 		bool internal_update = false;
@@ -201,7 +201,7 @@ namespace stylizer {
 			}
 		}
 
-		reaction::Action<> reconfigure; void reconfigure_impl(stdmath::vector<size_t, 2> size, enum present_mode present_mode,
+		reaction::Action<> reconfigure; void reconfigure_impl(stdmath::uint2 size, enum present_mode present_mode,
 			api::texture_format texture_format, api::alpha_mode alphas_mode, api::usage usage);
 
 		// Hide some of super's methods
@@ -218,8 +218,8 @@ namespace stylizer {
 
 
 	struct frame_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(frame_buffer)
-		reaction::Var<stdmath::vector<uint32_t, 3>> size;
-		std::optional<stdmath::vector<float, 4>> clear_value = {};
+		reaction::Var<stdmath::uint3> size;
+		std::optional<stdmath::float4> clear_value = {};
 
 		virtual texture& color_texture() = 0;
 		virtual std::span<const api::color_attachment> color_attachments(api::color_attachment attachment_template = {}) const = 0;
@@ -229,8 +229,8 @@ namespace stylizer {
 			return ctx.create_render_pass(color_attachments(color_template), depth_stencil_attachment(depth_template), one_shot);
 		}
 
-		virtual frame_buffer& update_size_debounced(const stdmath::vector<uint32_t, 3>& size, float dt, float time_to_wait = .1);
-		frame_buffer& update_size_debounced(const stdmath::vector<uint32_t, 3>& size, struct time& time, float time_to_wait = .1);
+		virtual frame_buffer& update_size_debounced(const stdmath::uint3& size, float dt, float time_to_wait = .1);
+		frame_buffer& update_size_debounced(const stdmath::uint3& size, struct time& time, float time_to_wait = .1);
 
 		frame_buffer& update_size_from_surface(surface& surface, struct time& time, float time_to_wait = .1) {
 			return update_size_debounced(surface.texture_size()(), time, time_to_wait);
@@ -240,7 +240,7 @@ namespace stylizer {
 		}
 
 		virtual reaction::Action<> link_size_to_surface(surface& surface) {
-			return reaction::action([this](const stdmath::vector<uint32_t, 3>& size) {
+			return reaction::action([this](const stdmath::uint3& size) {
 				this->size.value(size);
 			}, surface.texture_size());
 		}
@@ -358,22 +358,22 @@ namespace stylizer {
 	};
 
 	struct camera { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(camera)
-		virtual stdmath::matrix<float, 4, 4> view_matrix() const = 0;
-		virtual stdmath::matrix<float, 4, 4> projection_matrix(const stdmath::vector<size_t, 2>& screen_size) const = 0;
+		virtual stdmath::float4x4 view_matrix() const = 0;
+		virtual stdmath::float4x4 projection_matrix(const stdmath::uint2& screen_size) const = 0;
 
-		virtual stdmath::matrix<float, 4, 4> inverse_view_matrix() const {
+		virtual stdmath::float4x4 inverse_view_matrix() const {
 			return inverse(view_matrix());
 		}
-		virtual stdmath::matrix<float, 4, 4> inverse_projection_matrix(const stdmath::vector<size_t, 2>& screen_size) const {
+		virtual stdmath::float4x4 inverse_projection_matrix(const stdmath::uint2& screen_size) const {
 			return inverse(projection_matrix(screen_size));
 		}
 	};
 
 	struct concrete_camera : public camera { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(concrete_camera, camera)
-		stdmath::matrix<float, 4, 4> view, projection;
-		stdmath::matrix<float, 4, 4> inverse_view, inverse_projection;
+		stdmath::float4x4 view, projection;
+		stdmath::float4x4 inverse_view, inverse_projection;
 
-		static concrete_camera from_camera(const camera& camera, const stdmath::vector<size_t, 2>& screen_size) {
+		static concrete_camera from_camera(const camera& camera, const stdmath::uint2& screen_size) {
 			concrete_camera out;
 			out.view = camera.view_matrix();
 			out.projection = camera.projection_matrix(screen_size);
@@ -382,10 +382,10 @@ namespace stylizer {
 			return out;
 		}
 
-		stdmath::matrix<float, 4, 4> view_matrix() const override { return view; }
-		stdmath::matrix<float, 4, 4> projection_matrix(const stdmath::vector<size_t, 2>& screen_size = {}) const override { return projection; }
-		stdmath::matrix<float, 4, 4> inverse_view_matrix() const override { return inverse_view; }
-		stdmath::matrix<float, 4, 4> inverse_projection_matrix(const stdmath::vector<size_t, 2>& screen_size = {}) const override { return inverse_projection; }
+		stdmath::float4x4 view_matrix() const override { return view; }
+		stdmath::float4x4 projection_matrix(const stdmath::uint2& screen_size = {}) const override { return projection; }
+		stdmath::float4x4 inverse_view_matrix() const override { return inverse_view; }
+		stdmath::float4x4 inverse_projection_matrix(const stdmath::uint2& screen_size = {}) const override { return inverse_projection; }
 	};
 
 	struct utility_buffer : public managed_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(utility_buffer, managed_buffer)
@@ -405,7 +405,7 @@ namespace stylizer {
 	};
 
 	struct instance_data {
-		stdmath::matrix<float, 4, 4> model = stdmath::matrix<float, 4, 4>::identity();
+		stdmath::float4x4 model = stdmath::float4x4::identity();
 
 		struct buffer_base : public managed_buffer {
 			std::unordered_map<utility_buffer*, api::current_backend::bind_group> group_cache;

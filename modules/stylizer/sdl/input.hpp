@@ -40,12 +40,12 @@ namespace stylizer::sdl {
 			else return map[devices];
 		}
 
-		std::unordered_map<vector, std::unordered_map<device_t, reaction::Var<stdmath::vector<float, 2>>>> vectors;
+		std::unordered_map<vector, std::unordered_map<device_t, reaction::Var<stdmath::float2>>> vectors;
 
-		reaction::Var<stdmath::vector<float, 2>>& get_vector(vector what, device_t devices = all_devices) override {
+		reaction::Var<stdmath::float2>& get_vector(vector what, device_t devices = all_devices) override {
 			auto& map = vectors[what];
 			if(!map.contains(devices))
-				return map[devices] = reaction::var(stdmath::vector<float, 2>{});
+				return map[devices] = reaction::var(stdmath::float2{});
 			else return map[devices];
 		}
 

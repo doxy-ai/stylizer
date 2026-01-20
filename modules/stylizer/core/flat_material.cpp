@@ -115,12 +115,12 @@ float4 fragment(varryings vert) : SV_Target {
 		return *this;
 	}
 
-	flat_material flat_material::create(context& ctx, const frame_buffer& fb, const color_t& initial_color /* = stdmath::vector<float, 4>{.5, .5, .5, 1} */) {
+	flat_material flat_material::create(context& ctx, const frame_buffer& fb, const color_t& initial_color /* = stdmath::float4{.5, .5, .5, 1} */) {
 		flat_material out;
 		out.color = std::move((color_t&)initial_color);
 		bool input_srgb = true;
-		if(std::holds_alternative<stdmath::vector<float, 4>>(out.color))
-			out.config.color = std::get<stdmath::vector<float, 4>>(out.color);
+		if(std::holds_alternative<stdmath::float4>(out.color))
+			out.config.color = std::get<stdmath::float4>(out.color);
 		else {
 			out.config.use_texture = true;
 			input_srgb = api::is_srgb(std::get<maybe_owned<texture>>(out.color)->texture_format());

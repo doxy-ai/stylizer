@@ -51,13 +51,13 @@ namespace stylizer::sdl {
 				if(vectors.contains(mouse_wheel)) {
 					auto& map = vectors[mouse_wheel];
 					if(map.contains(input::all_devices)) {
-						update_if_any_different(map[all_devices], stdmath::vector<float, 2>{event.wheel.x, event.wheel.y});
+						update_if_any_different(map[all_devices], stdmath::float2{event.wheel.x, event.wheel.y});
 						processed = true;
 					}
 
 					device_t specific = event.wheel.which;
 					if(map.contains(specific)) {
-						update_if_any_different(map[specific], stdmath::vector<float, 2>{event.wheel.x, event.wheel.y});
+						update_if_any_different(map[specific], stdmath::float2{event.wheel.x, event.wheel.y});
 						processed = true;
 					}
 				}
@@ -69,13 +69,13 @@ namespace stylizer::sdl {
 				if(vectors.contains(mouse_position)) {
 					auto& map = vectors[mouse_position];
 					if(map.contains(input::all_devices)) {
-						update_if_any_different(map[all_devices], stdmath::vector<float, 2>{event.motion.x, event.motion.y});
+						update_if_any_different(map[all_devices], stdmath::float2{event.motion.x, event.motion.y});
 						processed = true;
 					}
 
 					device_t specific = event.motion.which;
 					if(map.contains(specific)) {
-						update_if_any_different(map[specific], stdmath::vector<float, 2>{event.motion.x, event.motion.y});
+						update_if_any_different(map[specific], stdmath::float2{event.motion.x, event.motion.y});
 						processed = true;
 					}
 				}

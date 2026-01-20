@@ -30,7 +30,7 @@ namespace stylizer { inline namespace images {
 
 		virtual texture& upload(context& ctx, texture& texture, texture::create_config config_template = {}, const std::optional<texture::sampler_config>& sampler_config = {}) {
 			auto byte_grid = get_byte_grid();
-			stdmath::vector<size_t, 3> extents = {extent(0), extent(1), extent(2)};
+			stdmath::uint3 extents = {extent(0), extent(1), extent(2)};
 			auto bytes_per_row = extents.x * extents.z * extent(3);
 			auto rows_per_image = extents.y;
 			auto size = bytes_per_row * rows_per_image;
@@ -60,11 +60,11 @@ namespace stylizer { inline namespace images {
 		static constexpr texture::format value = texture::format::RGBA32;
 	};
 	template<>
-	struct default_texture_format<stdmath::vector<float, 4>> {
+	struct default_texture_format<stdmath::float4> {
 		static constexpr texture::format value = texture::format::RGBA32;
 	};
 	template<>
-	struct default_texture_format<stdmath::vector<uint8_t, 4>> {
+	struct default_texture_format<stdmath::byte4> {
 		static constexpr texture::format value = texture::format::RGBA8srgb;
 	};
 	

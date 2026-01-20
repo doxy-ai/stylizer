@@ -57,14 +57,14 @@ namespace stylizer {
 		virtual void update() = 0;
 
 		reaction::Var<std::string> title;
-		reaction::Var<stdmath::vector<uint32_t, 2>> minimum_size, maximum_size; // Used when resizing (0, 0) == no limit
+		reaction::Var<stdmath::uint2> minimum_size, maximum_size; // Used when resizing (0, 0) == no limit
 		reaction::Var<bool> visible, maximized, minimized, focused, fullscreen, borderless;
 		reaction::Var<float> opacity;
 		reaction::Var<bool> close_requested, resizable, focusable, always_on_top, grab_keyboard, grab_mouse;
 #ifdef __EMSCRIPTEN__
 		reaction::Var<bool> fill_document;
 #endif
-		reaction::Var<stdmath::vector<int32_t, 2>> position;
+		reaction::Var<stdmath::int2> position;
 
 		// TODO: Icon
 
@@ -72,7 +72,7 @@ namespace stylizer {
 	};
 
 	template<typename T>
-	concept window_concept = std::derived_from<T, window> && requires(T t, context& ctx, std::string_view title, stdmath::vector<size_t, 2> size, window::create_flags flags) {
+	concept window_concept = std::derived_from<T, window> && requires(T t, context& ctx, std::string_view title,stdmath::uint2 size, window::create_flags flags) {
 		{ T::create(ctx, title, size, flags) } -> std::convertible_to<T>;
 		{ t.type } -> std::convertible_to<size_t>;
 	};

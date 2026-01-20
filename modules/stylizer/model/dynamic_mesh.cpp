@@ -97,10 +97,10 @@ namespace stylizer { inline namespace models {
 
 		stylizer::model out;
 		struct attributes {
-			stylizer::storage<stdmath::vector<float, 4>> positions;
-			stylizer::storage<stdmath::vector<float, 4>> colors;
-			stylizer::storage<stdmath::vector<float, 4>> normals;
-			stylizer::storage<stdmath::vector<float, 2>> uvs;
+			stylizer::storage<stdmath::float4> positions;
+			stylizer::storage<stdmath::float4> colors;
+			stylizer::storage<stdmath::float4> normals;
+			stylizer::storage<stdmath::float2> uvs;
 
 			stylizer::dynamic_mesh make_mesh() {
 				stylizer::dynamic_mesh mesh;
@@ -160,8 +160,8 @@ namespace stylizer { inline namespace models {
 			for(auto& [mat, attrs]: material_meshes) {
 				if(!material_map.contains(mat)) {
 					stylizer::flat_material material;
-					if(mat >= 0) material.color = stdmath::vector<float, 4>(materials[mat].diffuse[0], materials[mat].diffuse[1], materials[mat].diffuse[2], 1);
-					else material.color = stdmath::vector<float, 4>(.5, .5, .5, 1);
+					if(mat >= 0) material.color = stdmath::float4(materials[mat].diffuse[0], materials[mat].diffuse[1], materials[mat].diffuse[2], 1);
+					else material.color = stdmath::float4(.5, .5, .5, 1);
 
 					if(mat >= 0 && !materials[mat].diffuse_texname.empty()) {
 						std::filesystem::path path = materials[mat].diffuse_texname;

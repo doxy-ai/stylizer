@@ -299,7 +299,7 @@ namespace stylizer {
 			mouse_wheel,
 		};
 
-		virtual reaction::Var<stdmath::vector<float, 2>>& get_vector(vector what, device_t devices = all_devices) = 0;
+		virtual reaction::Var<stdmath::float2>& get_vector(vector what, device_t devices = all_devices) = 0;
 
 		// Tracks the change from the last event
 		template<reaction::IsReact Taction>
@@ -358,7 +358,7 @@ namespace stylizer {
 		}
 
 		template<reaction::IsReact Taction>
-		requires(!requires (Taction v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
+		requires(!requires (Taction v) { {v()} -> std::same_as<stdmath::float2>; })
 		static auto normalize(Taction action, float epsilon = .001) {
 			return reaction::calc([epsilon](auto v) {
 				return (float)stdmath::normalize(v, epsilon);
@@ -368,7 +368,7 @@ namespace stylizer {
 		template<reaction::IsReact Tx, reaction::IsReact Ty>
 		static auto floats_to_vector(Tx x, Ty y) {
 			return reaction::calc([](auto x, auto y) {
-				return stdmath::vector<float, 2>{(float)x, (float)y};
+				return stdmath::float2{(float)x, (float)y};
 			}, x, y);
 		}
 
@@ -378,7 +378,7 @@ namespace stylizer {
 		}
 
 		template<reaction::IsReact Tvector>
-		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
+		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::float2>; })
 		static auto x_axis(Tvector v) {
 			return reaction::calc([](const auto& v) {
 				return v.x;
@@ -386,7 +386,7 @@ namespace stylizer {
 		}
 
 		template<reaction::IsReact Tvector>
-		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
+		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::float2>; })
 		static auto y_axis(Tvector v) {
 			return reaction::calc([](const auto& v) {
 				return v.y;
@@ -394,17 +394,17 @@ namespace stylizer {
 		}
 
 		template<reaction::IsReact Tvector>
-		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
+		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::float2>; })
 		static auto dead_zone(Tvector v) {
 			return reaction::calc([](const auto& v, float dead_zone = .1) {
 				if(length_squared(v) < dead_zone * dead_zone)
-					return stdmath::vector<float, 2>{};
+					return stdmath::float2{};
 				return v;
 			}, v);
 		}
 
 		template<reaction::IsReact Tvector>
-		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::vector<float, 2>>; })
+		requires(requires (Tvector v) { {v()} -> std::same_as<stdmath::float2>; })
 		static auto normalize(Tvector v) {
 			return reaction::calc([](const auto& v) {
 				return stdmath::normalize(v);

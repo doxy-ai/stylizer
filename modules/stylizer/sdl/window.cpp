@@ -18,7 +18,7 @@ namespace stylizer::sdl {
 			title_updater = reaction::action([this](std::string_view title) { title_updater_impl(title); }, title);
 
 			o.min_max_size_updater.close();
-			min_max_size_updater = reaction::action([this](const stdmath::vector<uint32_t, 2>& min, const stdmath::vector<uint32_t, 2>& max) {
+			min_max_size_updater = reaction::action([this](const stdmath::uint2& min, const stdmath::uint2& max) {
 				min_max_size_updater_impl(min, max);
 			}, minimum_size, maximum_size);
 
@@ -75,7 +75,7 @@ namespace stylizer::sdl {
 	#endif
 
 			o.position_updater.close();
-			position_updater = reaction::action([this](const stdmath::vector<int32_t, 2>& position) {
+			position_updater = reaction::action([this](const stdmath::int2& position) {
 				position_updater_impl(position);
 			}, position);
 		});
@@ -83,7 +83,7 @@ namespace stylizer::sdl {
 		return *this;
 	}
 
-	window window::create(context& ctx, std::string_view title, stdmath::vector<size_t, 2> size, create_flags flags /* = create_flags::None */) {
+	window window::create(context& ctx, std::string_view title,stdmath::uint2 size, create_flags flags /* = create_flags::None */) {
 		get_global_sdl_event_handler(); // Setup SDL
 
 		SDL_WindowFlags sdl_flags = 0;
@@ -119,8 +119,8 @@ namespace stylizer::sdl {
 		out.title = reaction::var(std::string(title));
 		out.title_updater = reaction::action([]{});
 
-		out.minimum_size = reaction::var(stdmath::vector<uint32_t, 2>{0});
-		out.maximum_size = reaction::var(stdmath::vector<uint32_t, 2>{0});
+		out.minimum_size = reaction::var(stdmath::uint2{0});
+		out.maximum_size = reaction::var(stdmath::uint2{0});
 		out.min_max_size_updater = reaction::action([]{});
 
 		out.visible = reaction::var(true);
@@ -163,7 +163,7 @@ namespace stylizer::sdl {
 
 		int x, y;
 		SDL_GetWindowPosition(out.sdl, &x, &y);
-		out.position = reaction::var(stdmath::vector<int32_t, 2>{x, y});
+		out.position = reaction::var(stdmath::int2{x, y});
 		out.position_updater = reaction::action([]() {});
 
 		auto surface = api::sdl3::create_surface<api::current_backend::surface>(out.sdl);
@@ -171,7 +171,7 @@ namespace stylizer::sdl {
 
 		out.update_as_internal([&] {
 			SDL_GetWindowSize(out.sdl, &x, &y);
-			update_if_different<stdmath::vector<uint32_t, 2>>(out.size, stdmath::vector<int32_t, 2>{x, y});
+			update_if_different<stdmath::uint2>(out.size, stdmath::int2{x, y});
 		});
 
 		return out;
@@ -200,10 +200,10 @@ namespace stylizer::sdl {
 					update_if_different(visible, false);
 				// break; case SDL_EVENT_WINDOW_MOVED:
 				// 	// TODO: Why don't these update?
-				// 	position.value(stdmath::vector<int64_t, 2>{event.window.data1, event.window.data2});
+				// 	position.value(stdmath::int2{event.window.data1, event.window.data2});
 				// break; case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				// 	// TODO: Why don't these update?
-				// 	size.value(stdmath::vector<int64_t, 2>{event.window.data1, event.window.data2});
+				// 	size.value(stdmath::int2{event.window.data1, event.window.data2});
 				break; case SDL_EVENT_WINDOW_MINIMIZED:
 					update_if_different(minimized, true); // NOTE: These won't update on wayland... do we care?
 				break; case SDL_EVENT_WINDOW_MAXIMIZED:
@@ -235,7 +235,7 @@ namespace stylizer::sdl {
 			update_if_any_different(position, {x, y});
 
 			SDL_GetWindowSize(sdl, &x, &y);
-			update_if_any_different<stdmath::vector<uint32_t, 2>>(size, stdmath::vector<int32_t, 2>{x, y});
+			update_if_any_different<stdmath::uint2>(size, stdmath::int2{x, y});
 		}); });
 	}
 
@@ -249,7 +249,7 @@ namespace stylizer::sdl {
 		SDL_SetWindowTitle(sdl, cstring_from_view(title));
 	}
 
-	void window::min_max_size_updater_impl(const stdmath::vector<uint32_t, 2>& min, const stdmath::vector<uint32_t, 2>& max) {
+	void window::min_max_size_updater_impl(const stdmath::uint2& min, const stdmath::uint2& max) {
 		if(internal_update) return;
 
 		if(maximized && !minimized) SDL_MaximizeWindow(sdl);
@@ -325,7 +325,7 @@ namespace stylizer::sdl {
 	}
 #endif
 
-	void window::position_updater_impl(const stdmath::vector<int32_t, 2>& position) {
+	void window::position_updater_impl(const stdmath::int2& position) {
 		if(internal_update) return;
 
 		SDL_SetWindowPosition(sdl, position.x, position.y);

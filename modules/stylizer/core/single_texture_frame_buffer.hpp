@@ -10,8 +10,8 @@ namespace stylizer {
 		maybe_owned<texture> texture;
 
 		static single_texture_frame_buffer create(
-			context& ctx, const stdmath::vector<uint32_t, 3>& size,
-			const std::optional<stdmath::vector<float, 4>>& clear_value, api::texture::format color_format,
+			context& ctx, const stdmath::uint3& size,
+			const std::optional<stdmath::float4>& clear_value, api::texture::format color_format,
 			api::texture::create_config config_override = {}, const std::optional<texture::sampler_config>& sampler = {}
 		) {
 			auto config = config_override;
@@ -28,7 +28,7 @@ namespace stylizer {
 			return out;
 		}
 
-		static single_texture_frame_buffer create_from_texture(stylizer::texture& texture, const std::optional<stdmath::vector<float, 4>>& clear_value = {}) {
+		static single_texture_frame_buffer create_from_texture(stylizer::texture& texture, const std::optional<stdmath::float4>& clear_value = {}) {
 			single_texture_frame_buffer out;
 			out.size = texture.size;
 			out.clear_value = clear_value;

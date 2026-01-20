@@ -19,14 +19,14 @@ namespace stylizer { inline namespace images {
 		return load_file(ctx, file, get_loader_set()[file.extension().string()]);
 	}
 
-	stylizer::dynamic_memory_image<stdmath::vector<uint8_t, 4>> load_stb_image(context&, std::span<std::byte> memory, std::string_view extension /* = {} */) {
+	stylizer::dynamic_memory_image<stdmath::byte4> load_stb_image(context&, std::span<std::byte> memory, std::string_view extension /* = {} */) {
 		int x, y, n;
 		auto data = stbi_load_from_memory((uint8_t*)memory.data(), memory.size(), &x, &y, &n, 4);
-		std::span<stdmath::vector<uint8_t, 4>> span; std::vector<stdmath::vector<uint8_t, 4>> tmp;
+		std::span<stdmath::byte4> span; std::vector<stdmath::byte4> tmp;
 		if(n == 4)
-			span = {(stdmath::vector<uint8_t, 4>*)data, static_cast<size_t>(x * y)};
+			span = {(stdmath::byte4*)data, static_cast<size_t>(x * y)};
 		else if(n == 3) {
-			std::span<stdmath::vector<uint8_t, 3>> span3 = {(stdmath::vector<uint8_t, 3>*)data, static_cast<size_t>(x * y)};
+			std::span<stdmath::byte3> span3 = {(stdmath::byte3*)data, static_cast<size_t>(x * y)};
 			tmp.reserve(span3.size());
 			for(auto& vec: span3)
 				tmp.emplace_back(vec, 1); // If there is no alpha data we set alpha to 1

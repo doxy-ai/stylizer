@@ -9,7 +9,7 @@ namespace stylizer {
 		texture color, depth;
 
 		static color_depth_frame_buffer create(
-			context& ctx, const stdmath::vector<uint32_t, 3>& size, const std::optional<stdmath::vector<float, 4>>& clear_value, 
+			context& ctx, const stdmath::uint3& size, const std::optional<stdmath::float4>& clear_value, 
 			texture::format color_format, texture::format depth_format = texture::format::Depth_u24, 
 			const texture::create_config& config_override = {}, const texture::sampler_config& sampler = {}) 
 		{

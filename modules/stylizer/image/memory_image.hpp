@@ -36,5 +36,5 @@ namespace stylizer { inline namespace images {
 		Tcolor& get_pixel(size_t x, size_t y, size_t z = 0) { return *(Tcolor*)get_pixel_bytes(x, y, z).data(); }
 	};
 
-	stylizer::dynamic_memory_image<stdmath::vector<uint8_t, 4>> load_stb_image(context&, std::span<std::byte> memory, std::string_view extension = {});
+	stylizer::dynamic_memory_image<stdmath::byte4> load_stb_image(context&, std::span<std::byte> memory, std::string_view extension = {});
 }}

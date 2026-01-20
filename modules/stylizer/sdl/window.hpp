@@ -15,7 +15,7 @@ namespace stylizer::sdl {
 		window(window&& o) { *this = std::move(o); }
 		window& operator=(window&& o);
 
-		static window create(context& ctx, std::string_view title, stdmath::vector<size_t, 2> size, create_flags flags = create_flags::None);
+		static window create(context& ctx, std::string_view title,stdmath::uint2 size, create_flags flags = create_flags::None);
 
 		void register_event_listener(context& ctx) override;
 		void update() override;
@@ -23,7 +23,7 @@ namespace stylizer::sdl {
 
 	protected:
 		reaction::Action<> title_updater; void title_updater_impl(std::string_view title);
-		reaction::Action<> min_max_size_updater; void min_max_size_updater_impl(const stdmath::vector<uint32_t, 2>& min, const stdmath::vector<uint32_t, 2>& max);
+		reaction::Action<> min_max_size_updater; void min_max_size_updater_impl(const stdmath::uint2& min, const stdmath::uint2& max);
 		reaction::Action<> visible_updater; void visible_updater_impl(bool visible);
 		reaction::Action<> max_min_updater; void max_min_updater_impl(bool maximized, bool minimized);
 		// reaction::Action<> focused_updater; void focused_updater_impl(bool focused);
@@ -37,7 +37,7 @@ namespace stylizer::sdl {
 #ifdef __EMSCRIPTEN__
 		reaction::Action<> fill_document_updater; void fill_document_updater_impl(bool fill_document);
 #endif
-		reaction::Action<> position_updater; void position_updater_impl(const stdmath::vector<int32_t, 2>& position);
+		reaction::Action<> position_updater; void position_updater_impl(const stdmath::int2& position);
 	};
 
 	static_assert(window_concept<window>);

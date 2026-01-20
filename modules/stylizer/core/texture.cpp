@@ -16,7 +16,7 @@ namespace stylizer {
 			creation_context = o.creation_context;
 			size = std::move(o.size);
 			o.resize.close();
-			resize = reaction::action([this](const stdmath::vector<size_t, 3>& size) { resize_impl(size); }, size);
+			resize = reaction::action([this](const stdmath::uint3& size) { resize_impl(size); }, size);
 		});
 		return *this;
 	}
@@ -30,10 +30,10 @@ namespace stylizer {
 			out.config = config;
 			out.sample_config = sampler;
 			out.creation_context = &ctx;
-			out.size = reaction::var(stdmath::vector<uint32_t, 3>{out.config.size});
+			out.size = reaction::var(stdmath::uint3{out.config.size});
 			static_cast<api::current_backend::texture&>(out) = api::current_backend::texture::create(ctx, config);
 			if(sampler) out.configure_sampler(ctx, *sampler);
-			out.resize = reaction::action([self = &out](const stdmath::vector<size_t, 3>& size){
+			out.resize = reaction::action([self = &out](const stdmath::uint3& size){
 				self->resize_impl(size);
 			}, out.size);
 		});
@@ -51,13 +51,13 @@ namespace stylizer {
 
 	texture& texture::get_default_texture(context& ctx) {
 		static texture global = [](context& ctx) -> texture {
-			std::array<stdmath::vector<float, 4>, 4> default_texture_data = {{
+			std::array<stdmath::float4, 4> default_texture_data = {{
 				{1, 0, 0, 1},
 				{0, 1, 0, 1},
 				{0, 0, 1, 1},
 				{1, 1, 1, 1}
 			}};
-			auto out = stylizer::texture::create_and_write(ctx, stylizer::byte_span<stdmath::vector<float, 4>>(default_texture_data), stylizer::api::texture::data_layout{
+			auto out = stylizer::texture::create_and_write(ctx, stylizer::byte_span<stdmath::float4>(default_texture_data), stylizer::api::texture::data_layout{
 				.offset = 0,
 				.bytes_per_row = sizeof(default_texture_data[0]) * 2,
 				.rows_per_image = 2,
@@ -71,7 +71,7 @@ namespace stylizer {
 		return global;
 	}
 
-	void texture::resize_impl(const stdmath::vector<uint32_t, 3>& size) {
+	void texture::resize_impl(const stdmath::uint3& size) {
 		if(internal_update) return;
 
 		config.size = size;

@@ -7,10 +7,10 @@
 namespace stylizer {
 
 	struct flat_material : public material { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(flat_material, material)
-		using color_t = std::variant<stdmath::vector<float, 4>, maybe_owned<texture>>;
+		using color_t = std::variant<stdmath::float4, maybe_owned<texture>>;
 		color_t color;
 		struct config {
-			stdmath::vector<float, 4> color;
+			stdmath::float4 color;
 			uint32_t use_texture = false; 
 			std::array<float, 3> padding; // TODO: Why does slang align this so large!?!?
 			enum srgb_state : uint32_t {
@@ -26,7 +26,7 @@ namespace stylizer {
 		api::current_backend::bind_group group;
 
 		flat_material& create_from_configured(context& ctx, const frame_buffer& fb);
-		static flat_material create(context& ctx, const frame_buffer& fb, const color_t& initial_color = stdmath::vector<float, 4>{.5, .5, .5, 1});
+		static flat_material create(context& ctx, const frame_buffer& fb, const color_t& initial_color = stdmath::float4{.5, .5, .5, 1});
 
 		std::span<maybe_owned<api::current_backend::texture>> textures(context& ctx) override;
 		std::span<maybe_owned<api::current_backend::buffer>> buffers(context& ctx) override;
