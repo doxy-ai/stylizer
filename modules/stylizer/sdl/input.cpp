@@ -1,7 +1,7 @@
 #include "input.hpp"
 #include "event.hpp"
 
-namespace stylizer::sdl {
+namespace stylizer::sdl3 {
 
 	std::optional<connection>& get_global_sdl_event_handler(); // defined in core/util/sdl_event.cpp
 

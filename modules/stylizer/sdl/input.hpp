@@ -6,7 +6,7 @@
 
 union SDL_Event;
 
-namespace stylizer::sdl {
+namespace stylizer::sdl3 {
 
 	struct input: public stylizer::input {
 		size_t type = magic_number;

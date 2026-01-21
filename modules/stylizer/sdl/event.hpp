@@ -5,7 +5,7 @@
 #include <stylizer/core/api.hpp>
 #include <SDL3/SDL_events.h>
 
-namespace stylizer::sdl {
+namespace stylizer::sdl3 {
 	struct event: public stylizer::context::event {
 		size_t type = magic_number;
 		SDL_Event sdl;

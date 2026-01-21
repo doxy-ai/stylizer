@@ -6,7 +6,7 @@
 
 struct SDL_Window;
 
-namespace stylizer::sdl {
+namespace stylizer::sdl3 {
 	struct window : public stylizer::window { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(window, surface)
 		size_t type = magic_number;
 		SDL_Window* sdl;

@@ -6,7 +6,7 @@
 
 #include <stylizer/api/sdl3.hpp>
 
-namespace stylizer::sdl {
+namespace stylizer::sdl3 {
 
 	window& window::operator=(window&& o) {
 		*reinterpret_cast<stylizer::window*>(this) = std::move(o);

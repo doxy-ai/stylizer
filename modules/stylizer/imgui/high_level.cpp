@@ -9,7 +9,9 @@
 
 namespace stylizer {
 
-	imgui::imgui(context& ctx, window& window, api::texture::format color_format, api::texture::format depth_format /* = api::texture::format::Undefined */) {
+	imgui::imgui(context& ctx, window& window, std::optional<api::texture::format> color_format_override /* = {} */, api::texture::format depth_format /* = api::texture::format::Undefined */) {
+		api::texture::format color_format = color_format_override.value_or(window.texture_format());
+		
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 

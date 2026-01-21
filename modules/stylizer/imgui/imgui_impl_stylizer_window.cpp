@@ -10,9 +10,9 @@ static thread_local size_t selected_implementation_magic_number = -1;
 
 IMGUI_IMPL_API bool ImGui_ImplStylizerWindow_Init(stylizer::window& init_window) {
 #ifdef STYLIZER_SDL3_AVAILABLE
-	if(((stylizer::sdl::window*)&init_window)->type == stylizer::sdl::magic_number) {
-		auto& window = *(stylizer::sdl::window*)&init_window;
-		selected_implementation_magic_number = stylizer::sdl::magic_number;
+	if(((stylizer::sdl3::window*)&init_window)->type == stylizer::sdl3::magic_number) {
+		auto& window = *(stylizer::sdl3::window*)&init_window;
+		selected_implementation_magic_number = stylizer::sdl3::magic_number;
 
 		return ImGui_ImplSDL3_InitForOther(window.sdl);
 	}
@@ -22,7 +22,7 @@ IMGUI_IMPL_API bool ImGui_ImplStylizerWindow_Init(stylizer::window& init_window)
 IMGUI_IMPL_API void ImGui_ImplStylizerWindow_Shutdown() {
 	switch(selected_implementation_magic_number) {
 #ifdef STYLIZER_SDL3_AVAILABLE
-	case stylizer::sdl::magic_number:
+	case stylizer::sdl3::magic_number:
 		ImGui_ImplSDL3_Shutdown();
 		return;
 #endif
@@ -32,7 +32,7 @@ IMGUI_IMPL_API void ImGui_ImplStylizerWindow_Shutdown() {
 IMGUI_IMPL_API void ImGui_ImplStylizerWindow_NewFrame() {
 	switch(selected_implementation_magic_number) {
 #ifdef STYLIZER_SDL3_AVAILABLE
-	case stylizer::sdl::magic_number:
+	case stylizer::sdl3::magic_number:
 		ImGui_ImplSDL3_NewFrame();
 		return;
 #endif
@@ -42,9 +42,9 @@ IMGUI_IMPL_API void ImGui_ImplStylizerWindow_NewFrame() {
 IMGUI_IMPL_API stylizer::connection_raw ImGui_ImplStylizerWindow_RegisterEventListener(stylizer::context& ctx) {
 	switch(selected_implementation_magic_number) {
 #ifdef STYLIZER_SDL3_AVAILABLE
-	case stylizer::sdl::magic_number:
+	case stylizer::sdl3::magic_number:
 		return ctx.handle_event.connect([](const stylizer::context::event& e){
-			auto event = stylizer::sdl::event2sdl(e);
+			auto event = stylizer::sdl3::event2sdl(e);
 			if(!event) return;
 
 			ImGui_ImplSDL3_ProcessEvent(&event->sdl);

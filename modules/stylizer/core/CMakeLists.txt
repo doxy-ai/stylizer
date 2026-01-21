@@ -1,4 +1,4 @@
-add_subdirectory(embed)
+add_subdirectory(thirdparty/embed)
 
 add_library(stylizer_core texture.cpp surface.cpp flat_material.cpp frame_buffer.cpp instance_buffer.cpp util/load_file.cpp)
 target_include_directories(stylizer_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../..)

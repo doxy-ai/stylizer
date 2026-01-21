@@ -84,7 +84,7 @@ namespace stylizer { inline namespace models {
 		reader_config.mtl_search_path = std::filesystem::current_path().c_str(); // Path to material files
 		reader_config.vertex_color = true;
 
-		if (!reader.ParseFromString(std::string(memory.begin(), memory.end()), std::string(mtl.begin(), mtl.end()), reader_config))
+		if (!reader.ParseFromString(std::string((char*)memory.data(), (char*)(memory.data() + memory.size())), std::string((char*)mtl.data(), (char*)(mtl.data() + mtl.size())), reader_config))
 			if (!reader.Error().empty())
 				stylizer::get_error_handler()(stylizer::error_severity::Error, reader.Error(), 0);
 

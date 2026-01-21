@@ -1,6 +1,6 @@
 [submodule "modules/stylizer/api"]
 	path = modules/stylizer/api
 	url = https://github.com/doxy-ai/stylizer.api
-[submodule "modules/stylizer/core/embed"]
-	path = modules/stylizer/core/embed
+[submodule "modules/stylizer/core/thirdparty/embed"]
+	path = modules/stylizer/core/thirdparty/embed
 	url = https://github.com/batterycenter/embed.git

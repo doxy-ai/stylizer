@@ -3,7 +3,7 @@
 #define STYLIZER_GLOBAL_SDL_EVENT_HANDLER_IMPLEMENTATION
 #include "event.hpp"
 
-namespace stylizer::sdl {
+namespace stylizer::sdl3 {
 
     struct api_manager {
         static api_manager& singleton() {

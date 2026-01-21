@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <unordered_map>
+#include <span>
 #include "../thirdparty/mio.hpp"
 
 namespace stylizer {
