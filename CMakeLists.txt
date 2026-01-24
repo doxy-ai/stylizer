@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.30)
 project(stylizer CXX)
 
 set(CMAKE_CXX_STANDARD 26)
@@ -6,6 +6,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	add_compile_options(-stdlib=libc++)
 	add_link_options(-stdlib=libc++)
 endif()
+
+set(STYLIZER_FETCH_REACTIVE true)
 
 set(STYLIZER_FETCH_REACTION true)
 
@@ -48,3 +50,6 @@ foreach(child ${STYLIZER_MODULES_CHILDREN})
 		add_subdirectory("${child}")
 	endif()
 endforeach()
+
+add_executable(hello hello_gui.cpp)
+target_link_libraries(hello PUBLIC stylizer)
