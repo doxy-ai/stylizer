@@ -7,3 +7,4 @@ target_sources(stylizer PUBLIC
 		context.cppm
 )
 target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend)
+target_include_directories(stylizer PUBLIC ../../)
