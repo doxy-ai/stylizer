@@ -1,6 +1,7 @@
 export module stylizer:context;
 
 import std.compat;
+export import magic_enum;
 export import stylizer.errors;
 export import stylizer.auto_release;
 export import stylizer.spans;

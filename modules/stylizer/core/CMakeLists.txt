@@ -7,6 +7,7 @@ target_sources(stylizer PUBLIC
 		api.cppm
 		context.cppm
 		time.cppm
+		texture.cppm
 )
 target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend reaction)
 target_include_directories(stylizer PUBLIC ../../)
