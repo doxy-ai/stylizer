@@ -1,4 +1,4 @@
-add_library(stylizer)
+add_library(stylizer util/reaction.cpp)
 target_sources(stylizer PUBLIC
 	FILE_SET stylizer TYPE CXX_MODULES
 	# BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
@@ -7,5 +7,5 @@ target_sources(stylizer PUBLIC
 		context.cppm
 		time.cppm
 )
-target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend)
+target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend reaction)
 target_include_directories(stylizer PUBLIC ../../)

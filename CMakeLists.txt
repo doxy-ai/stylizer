@@ -52,4 +52,4 @@ foreach(child ${STYLIZER_MODULES_CHILDREN})
 endforeach()
 
 add_executable(hello hello_gui.cpp)
-target_link_libraries(hello PUBLIC stylizer)
+target_link_libraries(hello PUBLIC stylizer stylizer::sdl3)
