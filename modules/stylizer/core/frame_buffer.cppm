@@ -15,7 +15,7 @@ import :surface;
 
 namespace stylizer {
 	
-	struct frame_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(frame_buffer)
+	export struct frame_buffer { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(frame_buffer)
 		reaction::Var<stdmath::uint3> size;
 		std::optional<stdmath::float4> clear_value = {};
 
