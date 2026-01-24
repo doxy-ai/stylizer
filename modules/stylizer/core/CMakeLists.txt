@@ -5,6 +5,7 @@ target_sources(stylizer PUBLIC
 	FILES
 		api.cppm
 		context.cppm
+		time.cppm
 )
 target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend)
 target_include_directories(stylizer PUBLIC ../../)
