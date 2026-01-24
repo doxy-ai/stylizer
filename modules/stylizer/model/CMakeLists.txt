@@ -4,6 +4,7 @@ target_sources(stylizer_model PUBLIC
 	# BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
 	FILES
 		storage.cppm
+		mesh.cppm 
 		api.cppm
 )
 target_link_libraries(stylizer_model PUBLIC stylizer)
