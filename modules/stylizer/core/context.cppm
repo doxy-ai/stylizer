@@ -4,6 +4,7 @@ import std.compat;
 export import stylizer.errors;
 export import stylizer.auto_release;
 export import stylizer.spans;
+export import stylizer.maybe_owned;
 export import stylizer.graphics;
 export import stylizer.graphics.current_backend;
 
