@@ -1,16 +1,22 @@
 cmake_minimum_required(VERSION 3.21)
 project(stylizer CXX)
 
-set(STYLIZER_FETCH_REACTIVE true)
+set(CMAKE_CXX_STANDARD 26)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+	add_compile_options(-stdlib=libc++)
+	add_link_options(-stdlib=libc++)
+endif()
+
+set(STYLIZER_FETCH_REACTION true)
 
 include(FetchContent)
 
-if(STYLIZER_FETCH_REACTIVE)
+if(STYLIZER_FETCH_REACTION)
 	FetchContent_Declare(
-		fetch_reactive
-		GIT_REPOSITORY https://github.com/lumia431/reaction.git
+		fetch_reaction
+		GIT_REPOSITORY https://github.com/doxy-ai/reaction.git
 	)
-	FetchContent_MakeAvailable(fetch_reactive)
+	FetchContent_MakeAvailable(fetch_reaction)
 endif()
 
 set(STYLIZER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/modules/stylizer)
