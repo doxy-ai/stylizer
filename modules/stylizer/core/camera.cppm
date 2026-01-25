@@ -12,6 +12,8 @@ namespace stylizer {
 	export struct concrete_camera;
 
 	export struct camera { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(camera)
+		virtual ~camera() {}
+
 		virtual stdmath::float4x4 view_matrix() const = 0;
 		virtual stdmath::float4x4 projection_matrix(const stdmath::uint2& screen_size) const = 0;
 
