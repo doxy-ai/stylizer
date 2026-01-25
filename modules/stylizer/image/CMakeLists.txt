@@ -4,6 +4,7 @@ target_sources(stylizer_image PUBLIC
 	# BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
 	FILES 
 		image.cppm
+		memory_image.cppm
 		api.cppm
 )
 target_link_libraries(stylizer_image PUBLIC stylizer)
