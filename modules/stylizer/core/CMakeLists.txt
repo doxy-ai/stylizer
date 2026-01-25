@@ -14,6 +14,7 @@ target_sources(stylizer PUBLIC
 		buffer.utility.cppm
 		frame_buffer.cppm
 		frame_buffer.color_depth.cppm
+		frame_buffer.single_texture.cppm
 )
 target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend reaction)
 target_include_directories(stylizer PUBLIC ../../)
