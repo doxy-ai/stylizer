@@ -7,6 +7,7 @@ target_sources(stylizer PUBLIC
 		api.cppm
 		context.cppm
 		time.cppm
+		camera.cppm
 		texture.cppm
 		surface.cppm
 		buffer.cppm
