@@ -42,4 +42,13 @@ namespace stylizer {
 		{ T::create(ctx, fb) } -> std::convertible_to<T>;
 	};
 
+	export inline namespace common_mesh_attributes {
+		constexpr std::string_view positions = "positions";
+		constexpr std::string_view normals = "normals";
+		constexpr std::string_view colors = "colors";
+		constexpr std::string_view vertex_colors = "colors"; // alias to colors
+		constexpr std::string_view uvs = "uvs";
+		constexpr std::string_view texture_coordinates = "uvs"; // alias to uvs
+	}
+
 }
