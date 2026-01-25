@@ -6,3 +6,4 @@ export import :camera;
 export import :texture;
 export import :surface;
 export import :buffer;
+export import :utility_buffer;
