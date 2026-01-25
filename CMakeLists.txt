@@ -38,6 +38,3 @@ foreach(child ${STYLIZER_MODULES_CHILDREN})
 		add_subdirectory("${child}")
 	endif()
 endforeach()
-
-add_executable(hello hello_gui.cpp)
-target_link_libraries(hello PUBLIC stylizer stylizer::sdl3 stylizer::image stylizer::model)
