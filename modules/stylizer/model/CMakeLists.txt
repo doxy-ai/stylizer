@@ -7,5 +7,6 @@ target_sources(stylizer_model PUBLIC
 		api.cppm
 )
 target_link_libraries(stylizer_model PUBLIC stylizer)
+target_compile_definitions(stylizer_model PUBLIC -DSTYLIZER_MODEL_AVAILABLE)
 
 add_library(stylizer::model ALIAS stylizer_model)
