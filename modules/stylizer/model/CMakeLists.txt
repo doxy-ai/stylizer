@@ -6,6 +6,7 @@ target_sources(stylizer_model PUBLIC
 		storage.cppm
 		mesh.cppm
 		dynamic_mesh.cppm
+		instance_data.cppm
 		api.cppm
 )
 target_link_libraries(stylizer_model PUBLIC stylizer)
