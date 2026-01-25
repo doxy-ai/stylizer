@@ -20,18 +20,6 @@ import :instance_data;
 namespace stylizer { inline namespace models {
 
 	export struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(model)
-
-		// static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& model::get_loader_set() {
-		// 	static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>> loaders = []{
-		// 		std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>> out;
-		// 		// out[".obj"] = load_tinyobj_model_generic;
-		// 		return out;
-		// 	}();
-		// 	return loaders;
-		// }
-		// static maybe_owned<model> model::load(context& ctx, std::filesystem::path file) {
-		// 	return load_file(ctx, file, get_loader_set()[file.extension().string()]);
-		// }
 		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set() { STYLIZER_THROW("Not implemented yet"); }
 		static maybe_owned<model> load(context& ctx, std::filesystem::path file) { STYLIZER_THROW("Not implemented yet"); }
 
