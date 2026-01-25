@@ -33,3 +33,5 @@ function(stylizer_embed_absolute TARGET ABSOLUTE_PATH)
 	file(RELATIVE_PATH RELATIVE_PATH ${CURRENT_DIR} ${ABSOLUTE_PATH})
 	stylizer_embed(${TARGET} ${RELATIVE_PATH})
 endfunction(stylizer_embed_absolute)
+
+stylizer_embed(stylizer shaders/flat_material.slang)
