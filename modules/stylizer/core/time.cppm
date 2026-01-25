@@ -31,7 +31,7 @@ namespace stylizer {
 		}
 
 		template<typename Tprecision = std::micro, typename Tclock = std::chrono::system_clock>
-		inline time& update(float alpha = .9) {
+		inline time& per_frame(float alpha = .9) {
 			compute_delta_and_frame<Tprecision, Tclock>();
 			total += delta;
 			smoothed_delta = alpha * smoothed_delta + (1 - alpha) * delta;
