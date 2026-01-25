@@ -21,6 +21,8 @@ namespace stylizer { inline namespace images {
 		static std::unordered_map<std::string, std::function<maybe_owned<image>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set();
 		static maybe_owned<image> load(context& ctx, std::filesystem::path file);
 
+		virtual ~image() {}
+
 		virtual texture::format get_format() = 0;
 		virtual byte_grid get_byte_grid() = 0;
 		virtual size_t extent(size_t dimension) { return get_byte_grid().extent(dimension); }
@@ -33,7 +35,7 @@ namespace stylizer { inline namespace images {
 
 		virtual texture& upload(context& ctx, texture& texture, texture::create_config config_template = {}, const std::optional<texture::sampler_config>& sampler_config = {}) {
 			auto byte_grid = get_byte_grid();
-			stdmath::uint3 extents = {extent(0), extent(1), extent(2)};
+			stdmath::uint3 extents = {static_cast<unsigned int>(extent(0)), static_cast<unsigned int>(extent(1)), static_cast<unsigned int>(extent(2))};
 			auto bytes_per_row = extents.x * extents.z * extent(3);
 			auto rows_per_image = extents.y;
 			auto size = bytes_per_row * rows_per_image;
