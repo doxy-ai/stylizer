@@ -19,6 +19,8 @@ namespace stylizer {
 		reaction::Var<stdmath::uint3> size;
 		std::optional<stdmath::float4> clear_value = {};
 
+		virtual ~frame_buffer() {}
+
 		virtual texture& color_texture() = 0;
 		virtual const texture& color_texture() const { return const_cast<frame_buffer*>(this)->color_texture(); }
 		virtual std::span<const graphics::color_attachment> color_attachments(graphics::color_attachment attachment_template = {}) const = 0;
