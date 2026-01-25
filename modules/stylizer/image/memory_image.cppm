@@ -12,7 +12,7 @@ import stylizer;
 
 import :image;
 
-namespace stylizer {
+namespace stylizer { inline namespace images {
 	
     export template<typename Tcolor, size_t X, size_t Y, size_t Z = 1>
 	struct static_memory_image : public image { STYLIZER_MOVE_AND_MAKE_OWNED_DERIVED_METHODS(static_memory_image, image)
@@ -45,4 +45,4 @@ namespace stylizer {
 		Tcolor& get_pixel(size_t x, size_t y, size_t z = 0) { return *(Tcolor*)get_pixel_bytes(x, y, z).data(); }
 	};
 
-}
+}}
