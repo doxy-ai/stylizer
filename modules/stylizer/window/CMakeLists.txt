@@ -5,5 +5,6 @@ target_sources(stylizer_window PUBLIC
 	FILES api.cppm
 )
 target_link_libraries(stylizer_window PUBLIC stylizer)
+target_compile_definitions(stylizer_window PUBLIC -DSTYLIZER_WINDOW_AVAILABLE)
 
 add_library(stylizer::window ALIAS stylizer_window)
