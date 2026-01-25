@@ -20,8 +20,8 @@ import :instance_data;
 namespace stylizer { inline namespace models {
 
 	export struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(model)
-		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set() { STYLIZER_THROW("Not implemented yet"); }
-		static maybe_owned<model> load(context& ctx, std::filesystem::path file) { STYLIZER_THROW("Not implemented yet"); }
+		static std::unordered_map<std::string, std::function<maybe_owned<model>(context&, std::span<std::byte>, std::string_view)>>& get_loader_set();
+		static maybe_owned<model> load(context& ctx, std::filesystem::path file);
 
 		model& override_materials(material& override_material) {
 			for(auto& [mesh, mat]: *this)
