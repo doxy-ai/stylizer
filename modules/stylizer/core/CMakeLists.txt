@@ -18,7 +18,6 @@ target_sources(stylizer PUBLIC
 		frame_buffer.color_depth.cppm
 		frame_buffer.single_texture.cppm
 		material.cppm
-		material.flat.cppm
 )
 target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend reaction)
 target_compile_definitions(stylizer PUBLIC -DSTYLIZER_CORE_AVAILABLE)
