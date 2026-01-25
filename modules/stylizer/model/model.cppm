@@ -15,6 +15,8 @@ import stylizer;
 import :mesh;
 import :instance_data;
 
+#include <stylizer/core/material.flat.hpp>
+
 namespace stylizer { inline namespace models {
 
 	export struct model : public std::vector<std::pair<maybe_owned<mesh>, maybe_owned<material>>> { STYLIZER_MOVE_AND_MAKE_OWNED_METHODS(model)
@@ -44,12 +46,12 @@ namespace stylizer { inline namespace models {
 				if(mesh.owned) 
 					mesh->rebuild_gpu_caches(ctx);
 
-				// if(material.owned) {
-				// 	auto flat_mat = dynamic_cast<flat_material*>(&*material);
-				// 	if(!flat_mat) continue;
+				if(material.owned) {
+					auto flat_mat = dynamic_cast<flat_material*>(&*material);
+					if(!flat_mat) continue;
 					
-				// 	flat_mat->create_from_configured(ctx, fb);
-				// }
+					flat_mat->create_from_configured(ctx, fb);
+				}
 			}
 			return *this;
 		}
