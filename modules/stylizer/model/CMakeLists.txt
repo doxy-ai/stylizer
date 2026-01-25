@@ -8,9 +8,10 @@ target_sources(stylizer_model PUBLIC
 		dynamic_mesh.cppm
 		instance_data.cppm
 		model.cppm
+		load.cppm
 		api.cppm
 )
-target_link_libraries(stylizer_model PUBLIC stylizer)
+target_link_libraries(stylizer_model PUBLIC stylizer stylizer::image)
 target_compile_definitions(stylizer_model PUBLIC -DSTYLIZER_MODEL_AVAILABLE)
 
 add_library(stylizer::model ALIAS stylizer_model)
