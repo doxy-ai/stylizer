@@ -6,6 +6,7 @@ target_sources(stylizer PUBLIC
 	# BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
 	FILES
 		util/maybe_owned.cppm
+		util/load_file.cppm
 		api.cppm
 		context.cppm
 		time.cppm
