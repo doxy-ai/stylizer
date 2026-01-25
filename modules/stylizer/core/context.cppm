@@ -29,7 +29,7 @@ namespace stylizer {
 			context out;
 			static_cast<graphics::current_backend::device&>(out) = graphics::current_backend::device::create_default(config);
 			out.process_events.connect([](context& ctx) {
-				static_cast<graphics::current_backend::device&>(ctx).process_events();
+				static_cast<graphics::current_backend::device&>(ctx).per_frame();
 			});
 			return out;
 		}
@@ -48,7 +48,7 @@ namespace stylizer {
 			return create_default(config);
 		}
 
-		context& per_frame() {
+		bool per_frame(bool unused = true) override {
 			process_events(*this);
 			return *this;
 		}
