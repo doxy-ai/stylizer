@@ -48,7 +48,7 @@ namespace stylizer {
 			return create_default(config);
 		}
 
-		context& update() {
+		context& per_frame() {
 			process_events(*this);
 			return *this;
 		}
