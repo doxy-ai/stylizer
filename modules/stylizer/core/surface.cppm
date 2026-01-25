@@ -41,6 +41,7 @@ namespace stylizer {
 			}, size, present_mode, texture_format, alpha_mode, usage);
 			return *this;
 		}
+		virtual ~surface() {}
 
 		reaction::Var<stdmath::uint2> size;
 		reaction::Var<enum present_mode> present_mode; //= surface::present_mode::Fifo;
