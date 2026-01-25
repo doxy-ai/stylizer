@@ -15,7 +15,7 @@ import stylizer.load_file;
 import :image;
 import :memory;
 
-namespace stylizer {
+namespace stylizer { inline namespace images {
 	export stylizer::dynamic_memory_image<stdmath::byte4> load_stb_image(context&, std::span<std::byte> memory, std::string_view extension /* = {} */) {
 		int x, y, n;
 		auto data = stbi_load_from_memory((uint8_t*)memory.data(), memory.size(), &x, &y, &n, 4);
@@ -49,4 +49,4 @@ namespace stylizer {
 	maybe_owned<image> image::load(context& ctx, std::filesystem::path file) {
 		return load_file(ctx, file, get_loader_set()[file.extension().string()]);
 	}
-}
+}}
