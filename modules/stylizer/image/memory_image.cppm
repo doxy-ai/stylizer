@@ -1,5 +1,7 @@
 module;
 
+#include <cassert>
+
 #include <stylizer/core/util/move_and_make_owned_macros.hpp>
 
 export module stylizer.image:memory;
