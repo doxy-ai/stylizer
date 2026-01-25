@@ -61,7 +61,7 @@ namespace stylizer {
 
 		// Windows should not be moved after registering event listeners!
 		virtual void register_event_listener(context& ctx) = 0;
-		virtual void update() = 0;
+		virtual void per_frame() = 0;
 
 		reaction::Var<std::string> title;
 		reaction::Var<stdmath::uint2> minimum_size, maximum_size; // Used when resizing (0, 0) == no limit
