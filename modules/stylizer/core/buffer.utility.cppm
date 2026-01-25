@@ -20,8 +20,8 @@ namespace stylizer {
 			return {(std::byte*)&camera.view, ((std::byte*)&time) - ((std::byte*)&camera.view) + sizeof(time)};
 		}
 
-		utility_buffer& update(context& ctx, float alpha = .9) {
-			time.update(alpha);
+		utility_buffer& per_frame(context& ctx, float alpha = .9) {
+			time.per_frame(alpha);
 			upload(ctx, "Stylizer Utility Buffer");
 			return *this;
 		}
