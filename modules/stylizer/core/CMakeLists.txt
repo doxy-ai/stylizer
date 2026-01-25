@@ -9,6 +9,7 @@ target_sources(stylizer PUBLIC
 		time.cppm
 		texture.cppm
 		surface.cppm
+		managed_buffer.cppm
 )
 target_link_libraries(stylizer PUBLIC stylizer::graphics::current_backend reaction)
 target_include_directories(stylizer PUBLIC ../../)
