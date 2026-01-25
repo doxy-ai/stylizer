@@ -72,6 +72,6 @@ namespace stylizer {
 
 	protected:
 		// Hide some of super's methods
-		using super::tick;
+		using super::per_frame;
 	};
 }
