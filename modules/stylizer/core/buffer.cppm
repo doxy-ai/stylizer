@@ -2,7 +2,7 @@ module;
 
 #include "util/move_and_make_owned_macros.hpp"
 
-export module stylizer:managed_buffer;
+export module stylizer:buffer;
 
 import :context;
 
