@@ -8,7 +8,7 @@ import std.compat;
 import stdmath.slang;
 import stylizer;
 
-namespace stylizer {
+namespace stylizer { inline namespace images {
     using namespace magic_enum::bitwise_operators;
 
     export struct image { STYLIZER_MOVE_AND_MAKE_OWNED_BASE_METHODS(image)
@@ -74,4 +74,4 @@ namespace stylizer {
 	export template<typename Tcolor>
 	constexpr texture::format default_texture_format_v = default_texture_format<Tcolor>::value;
 
-}
+}}
