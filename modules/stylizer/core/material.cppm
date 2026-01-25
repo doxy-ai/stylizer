@@ -18,6 +18,7 @@ namespace stylizer {
 
 		material(const material&) = default;
 		material(material&) = default;
+		virtual ~material() {}
 
 		material& operator=(graphics::current_backend::render::pipeline&& pipeline) {
 			static_cast<graphics::current_backend::render::pipeline&>(*this) = std::move(pipeline);
@@ -32,6 +33,8 @@ namespace stylizer {
 		virtual std::span<std::string_view> requested_mesh_attributes() = 0;
 
 		virtual std::span<graphics::current_backend::bind_group> bind_groups(context& ctx) = 0;
+
+		virtual material& upload(context& ctx) = 0;
 	};
 
 	export template<typename T>
