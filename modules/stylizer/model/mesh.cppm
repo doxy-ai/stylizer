@@ -76,6 +76,8 @@ namespace stylizer { inline namespace models {
 			storage<stdmath::int4>& get_int4() { return std::get<storage<stdmath::int4>>(*this); }
 		};
 
+		virtual ~mesh() {}
+
 		virtual std::optional<size_t> lookup_attribute(std::string_view name) = 0;
 		virtual std::span<std::string_view> available_attributes() = 0;
 		virtual std::vector<size_t> build_attribute_list(std::span<std::string_view> requested_attributes) {
