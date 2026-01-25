@@ -6,7 +6,6 @@ module;
 export module stylizer.model:storage;
 
 import std.compat;
-import stdmath;
 import stdmath.slang;
 import stylizer;
 
