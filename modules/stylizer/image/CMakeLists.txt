@@ -5,6 +5,7 @@ target_sources(stylizer_image PUBLIC
 	FILES 
 		image.cppm
 		memory_image.cppm
+		load.cppm
 		api.cppm
 )
 target_link_libraries(stylizer_image PUBLIC stylizer)
