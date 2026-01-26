@@ -6,7 +6,10 @@ module;
 // export module stylizer:flat_material;
 export module stylizer.flat_material;
 
-import :material;
+// import :material;
+import std.compat;
+import stdmath.slang;
+import stylizer;
 
 namespace stylizer {
 
