@@ -15,7 +15,7 @@ import stylizer;
 import :mesh;
 import :instance_data;
 
-#include <stylizer/core/material.flat.hpp>
+#include <stylizer/core/material.flat.hpp.bak>
 
 namespace stylizer { inline namespace models {
 
