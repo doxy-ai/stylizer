@@ -56,7 +56,7 @@ namespace stylizer {
 		template<typename... Tothers>
 		context& per_frame(Tothers&... args) {
 			constexpr static auto per_frame_invoke = [](context& self, auto& arg) {
-				if constexpr (requires () { arg(self); }) {
+				if constexpr (requires () { arg.per_frame(self); }) {
 					arg.per_frame(self);
 				} else arg.per_frame();
 			};
