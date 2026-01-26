@@ -3,7 +3,8 @@ module;
 #include "util/move_and_make_owned_macros.hpp"
 #include "battery/embed.hpp"
 
-export module stylizer:flat_material;
+// export module stylizer:flat_material;
+export module stylizer.flat_material;
 
 import :material;
 
