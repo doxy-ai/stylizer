@@ -19,16 +19,17 @@ namespace stylizer { inline namespace images {
 	export stylizer::dynamic_memory_image<stdmath::byte4> load_stb_image(context&, std::span<std::byte> memory, std::string_view extension /* = {} */) {
 		int x, y, n;
 		auto data = stbi_load_from_memory((uint8_t*)memory.data(), memory.size(), &x, &y, &n, 4);
-		std::span<stdmath::byte4> span; std::vector<stdmath::byte4> tmp;
-		if(n == 4)
+		std::span<stdmath::byte4> span; //std::vector<stdmath::byte4> tmp;
+		// if(n == 4)
 			span = {(stdmath::byte4*)data, static_cast<size_t>(x * y)};
-		else if(n == 3) {
-			std::span<stdmath::byte3> span3 = {(stdmath::byte3*)data, static_cast<size_t>(x * y)};
-			tmp.reserve(span3.size());
-			for(auto& vec: span3)
-				tmp.emplace_back(vec, std::byte{255}); // If there is no alpha data we set alpha to max
-			span = tmp;
-		}
+		// else if(n == 3) {
+		// 	std::span<stdmath::byte3> span3 = {(stdmath::byte3*)data, static_cast<size_t>(x * y)};
+		// 	auto dbg = (uint8_t*)span3.data();
+		// 	tmp.reserve(span3.size());
+		// 	for(auto& vec: span3)
+		// 		tmp.emplace_back(vec, std::byte{255}); // If there is no alpha data we set alpha to max
+		// 	span = tmp;
+		// }
 
 		return {span, stylizer::dynamic_memory_image<uint8_t>::extents_t(x, y, 1)};
 	}
