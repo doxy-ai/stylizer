@@ -29,7 +29,7 @@ namespace stylizer {
 			context out;
 			static_cast<graphics::current_backend::device&>(out) = graphics::current_backend::device::create_default(config);
 			out.process_events.connect([](context& ctx) {
-				static_cast<graphics::current_backend::device&>(ctx).per_frame();
+				static_cast<graphics::current_backend::device&>(ctx).process_events();
 			});
 			return out;
 		}
@@ -48,8 +48,20 @@ namespace stylizer {
 			return create_default(config);
 		}
 
-		bool per_frame(bool unused = true) override {
+		context& per_frame() {
 			process_events(*this);
+			return *this;
+		}
+
+		template<typename... Tothers>
+		context& per_frame(Tothers&... args) {
+			constexpr static auto per_frame_invoke = [](context& self, auto& arg) {
+				if constexpr (requires () { arg(self); }) {
+					arg.per_frame(self);
+				} else arg.per_frame();
+			};
+			per_frame();
+			(per_frame_invoke(*this, args), ...);
 			return *this;
 		}
 
@@ -72,6 +84,6 @@ namespace stylizer {
 
 	protected:
 		// Hide some of super's methods
-		using super::per_frame;
+		using super::tick;
 	};
 }
