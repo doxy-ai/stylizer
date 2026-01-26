@@ -30,6 +30,7 @@ namespace stylizer { inline namespace models {
 			}
 
 			virtual size_t count() const = 0;
+			virtual instance_data& at(size_t index) = 0;
 
 			virtual void rebuild_gpu_caches() {
 				group_cache.clear();
@@ -41,6 +42,7 @@ namespace stylizer { inline namespace models {
 			using base = instance_data::buffer_base;
 
 			size_t count() const override { return N; }
+			instance_data& at(size_t index) override { return std::array<instance_data, N>::at(index); }
 
 			std::span<const std::byte> to_bytes() override {
 				return byte_span<instance_data>(static_cast<std::array<instance_data, N>&>(*this));
@@ -53,6 +55,7 @@ namespace stylizer { inline namespace models {
 		using base = instance_data::buffer_base;
 
 		size_t count() const override { return std::vector<instance_data>::size(); }
+		instance_data& at(size_t index) override { return std::vector<instance_data>::at(index); }
 
 		std::span<const std::byte> to_bytes() override {
 			return byte_span<instance_data>(static_cast<std::vector<instance_data>&>(*this));
