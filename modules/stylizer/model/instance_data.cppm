@@ -18,7 +18,16 @@ namespace stylizer { inline namespace models {
 		struct buffer_base : public managed_buffer {
 			std::unordered_map<utility_buffer*, graphics::current_backend::bind_group> group_cache;
 
-			graphics::current_backend::bind_group make_bind_group(context& ctx, graphics::current_backend::render_pipeline& pipeline, std::optional<utility_buffer> util = {}, size_t index = 0, size_t minimum_util_size = 272);
+			graphics::current_backend::bind_group make_bind_group(context& ctx, graphics::current_backend::render_pipeline& pipeline, std::optional<utility_buffer> util = {}, size_t index = 0, size_t minimum_util_size = 272) {
+				utility_buffer* cacher = util ? &*util : nullptr;
+				if(group_cache.contains(cacher)) return group_cache[cacher];
+
+				std::array<graphics::bind_group::binding, 2> bindings;
+				bindings[0] = graphics::bind_group::buffer_binding{&*this};
+				if(util) bindings[1] = graphics::bind_group::buffer_binding{&*util};
+				else bindings[1] = graphics::bind_group::buffer_binding{&ctx.get_zero_buffer_singleton(graphics::usage::Storage, minimum_util_size)};
+				return group_cache[cacher] = pipeline.create_bind_group(ctx, index, bindings);
+			}
 
 			virtual size_t count() const = 0;
 
