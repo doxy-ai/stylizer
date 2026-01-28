@@ -1,3 +1,4 @@
+add_subdirectory(thirdparty/reaction)
 add_subdirectory(thirdparty/embed)
 
 add_library(stylizer util/reaction.cpp)

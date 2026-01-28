@@ -7,19 +7,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	add_link_options(-stdlib=libc++)
 endif()
 
-set(STYLIZER_FETCH_REACTIVE true)
-
-set(STYLIZER_FETCH_REACTION true)
-
 include(FetchContent)
-
-if(STYLIZER_FETCH_REACTION)
-	FetchContent_Declare(
-		fetch_reaction
-		GIT_REPOSITORY https://github.com/doxy-ai/reaction.git
-	)
-	FetchContent_MakeAvailable(fetch_reaction)
-endif()
 
 set(STYLIZER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/modules/stylizer)
 set(STYLIZER_EXTRA_MODULE_REPOSITORIES
