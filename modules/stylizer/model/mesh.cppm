@@ -161,6 +161,21 @@ namespace stylizer { inline namespace models {
 		virtual std::span<uint32_t> set_index_data(std::span<const uint32_t> indicies) = 0;
 		virtual mesh& clear_index_data() { return *this; }
 
+		virtual stdmath::box<stdmath::real_t> calculate_AABB() {
+			auto& positions_ = attribute_storage(lookup_attribute(stylizer::common_mesh_attributes::positions).value());
+			auto& positions = std::get<stylizer::storage<stdmath::float4>>(positions_);
+
+			assert(positions.size() >= 2);
+			stdmath::box<stdmath::real_t> out;
+			out.min = positions[0].xyz().to_vector();
+			out.max = positions[1].xyz().to_vector();
+			out.normalize();
+
+			for(size_t i = 2; i < positions.size(); ++i)
+				out.expand(positions[i].xyz().to_vector());
+			return out;
+		}
+
 		virtual bool verify() {
 			auto indicies = attribute_indicies();
 			auto vertex_count = this->vertex_count();

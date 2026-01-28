@@ -44,6 +44,13 @@ namespace stylizer { inline namespace models {
 			return *this;
 		}
 
+		stdmath::box<stdmath::real_t> calculate_AABB() {
+			stdmath::box<stdmath::real_t> out = {{0}, {0}};
+			for(auto& [mesh, mat]: *this)
+				out.expand(mesh->calculate_AABB());
+			return out;
+		}
+
 		graphics::current_backend::render::pass& draw_instanced(
 			context& ctx, graphics::current_backend::render::pass& render_pass,
 			instance_data::buffer_base& instance_data, std::optional<utility_buffer> util = {}
